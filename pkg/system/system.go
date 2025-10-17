@@ -27,3 +27,11 @@ func NewSystem() *System {
 
 	return &system
 }
+
+func (s *System) Core() *cpu.Core {
+	return s.core
+}
+
+func (s *System) Bus() *devices.Bus {
+	return &s.bus
+}
