@@ -10,19 +10,19 @@ const (
 )
 
 type System struct {
-	core        *cpu.Core
-	mmioDevices devices.MMIODevices
+	core *cpu.Core
+	bus  devices.Bus
 }
 
 func NewSystem() *System {
-	mmioDevices := devices.MMIODevices{}
+	bus := devices.Bus{}
 	ramDevice := devices.RAMDevice{}
 	ramDevice.Initialize(RAMOffset, 0x10000000) // 256 MB RAM
-	mmioDevices.AddDevice(&ramDevice)
+	bus.AddDevice(&ramDevice)
 
 	system := System{
-		core:        cpu.NewCore(),
-		mmioDevices: mmioDevices,
+		core: cpu.NewCore(),
+		bus:  bus,
 	}
 
 	return &system

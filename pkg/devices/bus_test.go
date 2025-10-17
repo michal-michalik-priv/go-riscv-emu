@@ -2,55 +2,55 @@ package devices
 
 import "testing"
 
-type MockMMIODevice struct {
+type MockBusDevice struct {
 	baseAddress uint32
 	size        uint32
 	memory      []byte
 }
 
-func (m *MockMMIODevice) Read(address uint32) (byte, error) {
+func (m *MockBusDevice) Read(address uint32) (byte, error) {
 	offset := address - m.baseAddress
 	return m.memory[offset], nil
 }
 
-func (m *MockMMIODevice) Write(address uint32, value byte) error {
+func (m *MockBusDevice) Write(address uint32, value byte) error {
 	offset := address - m.baseAddress
 	m.memory[offset] = value
 	return nil
 }
 
-func (m *MockMMIODevice) BaseAddress() uint32 {
+func (m *MockBusDevice) BaseAddress() uint32 {
 	return m.baseAddress
 }
 
-func (m *MockMMIODevice) Size() uint32 {
+func (m *MockBusDevice) Size() uint32 {
 	return m.size
 }
 
-func (m *MockMMIODevice) Initialize(baseAddress, size uint32) {
+func (m *MockBusDevice) Initialize(baseAddress, size uint32) {
 	m.baseAddress = baseAddress
 	m.size = size
 	m.memory = make([]byte, size)
 }
 
-func setupMMIOFixture() *MMIODevices {
-	mmio := &MMIODevices{}
+func setupBusFixture() *Bus {
+	bus := &Bus{}
 
-	// Create and add a mock MMIO device
-	mockDevice := &MockMMIODevice{}
+	// Create and add a mock Bus device
+	mockDevice := &MockBusDevice{}
 	mockDevice.Initialize(0x1000, 256) // Base address 0x1000, size 256 bytes
-	mmio.AddDevice(mockDevice)
+	bus.AddDevice(mockDevice)
 
-	return mmio
+	return bus
 }
 
-func TestMMIOReadWrite(t *testing.T) {
-	mmio := setupMMIOFixture()
+func TestBusReadWrite(t *testing.T) {
+	bus := setupBusFixture()
 
 	// Test writing and reading a byte within the mock device
 	address := uint32(0x1000) // Within the mock device range
 	value := byte(55)
-	device := mmio.FindDevice(address)
+	device := bus.FindDevice(address)
 	if device == nil {
 		t.Errorf("Expected to find device at address %X, got nil", address)
 		return
@@ -58,13 +58,13 @@ func TestMMIOReadWrite(t *testing.T) {
 
 	err := device.Write(address, value)
 	if err != nil {
-		t.Errorf("Error writing to MMIO device: %v", err)
+		t.Errorf("Error writing to Bus device: %v", err)
 		return
 	}
 
 	readValue, err := device.Read(address)
 	if err != nil {
-		t.Errorf("Error reading from MMIO device: %v", err)
+		t.Errorf("Error reading from Bus device: %v", err)
 		return
 	}
 
@@ -74,12 +74,12 @@ func TestMMIOReadWrite(t *testing.T) {
 	}
 }
 
-func TestMMIOOutOfBounds(t *testing.T) {
-	mmio := setupMMIOFixture()
+func TestBusOutOfBounds(t *testing.T) {
+	bus := setupBusFixture()
 
 	// Test reading out of bounds
 	address := uint32(0x2000) // Outside the mock device range
-	device := mmio.FindDevice(address)
+	device := bus.FindDevice(address)
 	if device != nil {
 		t.Errorf("Expected no device at address %X, but found one", address)
 	}
