@@ -1,6 +1,9 @@
 package memory
 
-import "fmt"
+import (
+	"fmt"
+	"log/slog"
+)
 
 // RandomAccessMemory simulates a simple RAM module.
 type RandomAccessMemory struct {
@@ -10,7 +13,7 @@ type RandomAccessMemory struct {
 
 // NewRAM creates a new RAM instance with the specified size in bytes.
 func NewRAM(size uint32) *RandomAccessMemory {
-	fmt.Printf("Initializing RAM of size %d bytes\n", size)
+	slog.Debug(fmt.Sprintf("Initializing RAM of size %d bytes\n", size))
 	return &RandomAccessMemory{
 		size: size,
 		data: make([]byte, size),
