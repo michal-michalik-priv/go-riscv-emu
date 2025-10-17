@@ -15,3 +15,7 @@ func NewCore() *Core {
 func (c *Core) SetPc(value uint32) {
 	c.pc = value
 }
+
+func (c *Core) GetPc() uint32 {
+	return c.pc
+}
