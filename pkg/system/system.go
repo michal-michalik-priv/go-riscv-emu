@@ -6,14 +6,17 @@ import (
 )
 
 const (
+	// RAMOffset is the starting address of the RAM in the system's memory map.
 	RAMOffset = 0x80000000
 )
 
+// System represents the entire emulation system, including the CPU and memory.
 type System struct {
 	core *cpu.Core
 	bus  devices.Bus
 }
 
+// NewSystem initializes and returns a new System with a CPU core and RAM device.
 func NewSystem() *System {
 	bus := devices.Bus{}
 	ramDevice := devices.RAMDevice{}
@@ -28,14 +31,17 @@ func NewSystem() *System {
 	return &system
 }
 
+// Core returns the CPU core of the system.
 func (s *System) Core() *cpu.Core {
 	return s.core
 }
 
+// Bus returns the device bus of the system.
 func (s *System) Bus() *devices.Bus {
 	return &s.bus
 }
 
+// Step executes a single instruction cycle of the CPU core.
 func (s *System) Step() {
 	cpu.Step(s.core)
 }
