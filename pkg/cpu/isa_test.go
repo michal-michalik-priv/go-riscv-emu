@@ -110,3 +110,39 @@ func TestStep(t *testing.T) {
 		t.Fatalf("Step failed: %v", err)
 	}
 }
+
+func TestLui(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+
+	instr := uTypeInstruction{
+		rd:  3,       // Destination register x3
+		imm: 0x12345, // Immediate value
+	}
+
+	err := lui(core, instr)
+	if err != nil {
+		t.Fatalf("lui failed: %v", err)
+	}
+
+	expected := uint32(0x12345000) // 0x12345 << 12
+	if core.x[3] != expected {
+		t.Errorf("Expected x3 to be %X, got %X", expected, core.x[3])
+	}
+}
+
+func TestExecute_Lui(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+
+	// Encode LUI x4, 0x1ABCD
+	instruction := uint32(0b00011010101111001101001000110111)
+
+	err := execute(core, instruction)
+	if err != nil {
+		t.Fatalf("execute failed: %v", err)
+	}
+
+	expected := uint32(0x1ABCD000) // 0x1ABCD << 12
+	if core.x[4] != expected {
+		t.Errorf("Expected x4 to be %X, got %X", expected, core.x[4])
+	}
+}

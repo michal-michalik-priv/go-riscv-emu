@@ -11,6 +11,7 @@ import (
 const (
 	opcodeAddi = 0b0010011
 	opcodeJalr = 0b1100111
+	opcodeLui  = 0b0110111
 )
 
 // RV32I Funct3 for I-type instructions
@@ -26,6 +27,12 @@ type iTypeInstruction struct {
 	imm int32  // Immediate value
 }
 
+// uTypeInstruction represents a parsed U-type instruction
+type uTypeInstruction struct {
+	rd  uint32 // Destination register
+	imm int32  // Immediate value
+}
+
 // parseIType parses a 32-bit I-type instruction and returns an
 // iTypeInstruction struct.
 func parseIType(instruction uint32) iTypeInstruction {
@@ -38,6 +45,18 @@ func parseIType(instruction uint32) iTypeInstruction {
 		rd:  rd,
 		rs1: rs1,
 		imm: imm,
+	}
+}
+
+// parseUType parses a 32-bit U-type instruction and returns a
+// uTypeInstruction struct.
+func parseUType(instruction uint32) uTypeInstruction {
+	rd := utils.BitsSlice(instruction, 7, 12)
+	imm20 := utils.BitsSlice(instruction, 12, 32)
+
+	return uTypeInstruction{
+		rd:  rd,
+		imm: int32(imm20),
 	}
 }
 
@@ -58,6 +77,14 @@ func jarl(core *Core, instr iTypeInstruction) error {
 	return nil
 }
 
+// lui executes the LUI instruction on the given core.
+func lui(core *Core, instr uTypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing LUI instruction: %+v\n", instr))
+	core.x[instr.rd] = uint32(instr.imm) << 12
+	core.pc += 4
+	return nil
+}
+
 // Parse parses a 32-bit instruction word and returns the corresponding
 // instruction struct based on the opcode and funct3 fields.
 func execute(core *Core, instruction uint32) error {
@@ -69,6 +96,8 @@ func execute(core *Core, instruction uint32) error {
 		return addi(core, parseIType(instruction))
 	case opcode == opcodeJalr && func3 == iTypeFunc3Jalr:
 		return jarl(core, parseIType(instruction))
+	case opcode == opcodeLui: // TODO: We might check that before slicing func3
+		return lui(core, parseUType(instruction))
 
 	default:
 		return fmt.Errorf("unsupported instruction, %032b", instruction)
