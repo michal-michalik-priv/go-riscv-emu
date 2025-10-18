@@ -1,6 +1,8 @@
 package system
 
 import (
+	"log/slog"
+
 	"github.com/Keisim/go-riscv-emu/pkg/cpu"
 	"github.com/Keisim/go-riscv-emu/pkg/devices"
 )
@@ -43,5 +45,9 @@ func (s *System) Bus() *devices.Bus {
 
 // Step executes a single instruction cycle of the CPU core.
 func (s *System) Step() {
-	cpu.Step(s.core)
+	err := cpu.Step(s.core)
+	if err != nil {
+		slog.Error("Failed to execute CPU step:", "error", err)
+		panic(err)
+	}
 }
