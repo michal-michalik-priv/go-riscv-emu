@@ -2,6 +2,7 @@ package devices
 
 // BusDevice represents a memory-mapped I/O device.
 type BusDevice interface {
+	Initialize(baseAddress, size uint32)
 	Read(address uint32) (byte, error)
 	Write(address uint32, value byte) error
 	BaseAddress() uint32
