@@ -7,7 +7,7 @@ import (
 )
 
 func TestLoadELFToSystem(t *testing.T) {
-	sys := system.NewSystem()
+	sys := system.NewSystem(false)
 
 	err := LoadELFToSystem("../../misc/c/empty_main.o", sys)
 	if err != nil {

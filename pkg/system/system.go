@@ -9,7 +9,8 @@ import (
 
 const (
 	// RAMOffset is the starting address of the RAM in the system's memory map.
-	RAMOffset = 0x80000000
+	RAMOffset      = 0x80000000
+	DummyTTYOffset = 0x10000000
 )
 
 // System represents the entire emulation system, including the CPU and memory.
@@ -19,11 +20,17 @@ type System struct {
 }
 
 // NewSystem initializes and returns a new System with a CPU core and RAM device.
-func NewSystem() *System {
+func NewSystem(dummy_tty bool) *System {
 	bus := devices.Bus{}
 	ramDevice := devices.RAMDevice{}
 	ramDevice.Initialize(RAMOffset, 0x10000000) // 256 MB RAM
 	bus.AddDevice(&ramDevice)
+
+	if dummy_tty {
+		dummyTTYDevice := devices.DummyTTYDevice{}
+		dummyTTYDevice.Initialize(DummyTTYOffset, 0x1) // 1 byte of Dummy TTY
+		bus.AddDevice(&dummyTTYDevice)
+	}
 
 	system := System{
 		core: cpu.NewCore(&bus),
