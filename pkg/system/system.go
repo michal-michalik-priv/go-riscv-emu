@@ -21,7 +21,7 @@ func NewSystem() *System {
 	bus.AddDevice(&ramDevice)
 
 	system := System{
-		core: cpu.NewCore(),
+		core: cpu.NewCore(&bus),
 		bus:  bus,
 	}
 
@@ -34,4 +34,8 @@ func (s *System) Core() *cpu.Core {
 
 func (s *System) Bus() *devices.Bus {
 	return &s.bus
+}
+
+func (s *System) Step() {
+	cpu.Step(s.core)
 }

@@ -3,10 +3,12 @@ package cpu
 import (
 	"strings"
 	"testing"
+
+	"github.com/Keisim/go-riscv-emu/pkg/devices"
 )
 
 func TestAddi(t *testing.T) {
-	core := NewCore()
+	core := NewCore(&devices.Bus{})
 	core.x[1] = 10 // Set register x1 to 10
 
 	instr := ITypeInstruction{
@@ -27,7 +29,7 @@ func TestAddi(t *testing.T) {
 }
 
 func TestExecute_Addi(t *testing.T) {
-	core := NewCore()
+	core := NewCore(&devices.Bus{})
 	core.x[1] = 20 // Set register x1 to 20
 
 	// Encode ADDI x2, x1, 10
@@ -45,7 +47,7 @@ func TestExecute_Addi(t *testing.T) {
 }
 
 func TestExecute_UnsupportedInstruction(t *testing.T) {
-	core := NewCore()
+	core := NewCore(&devices.Bus{})
 
 	// Encode an unsupported instruction
 	instruction := uint32(0xFFFFFFFF)
@@ -61,7 +63,7 @@ func TestExecute_UnsupportedInstruction(t *testing.T) {
 }
 
 func TestJalr(t *testing.T) {
-	core := NewCore()
+	core := NewCore(&devices.Bus{})
 	core.x[1] = 0x1000 // Set register x1 to target address
 	core.pc = 0x2000   // Set program counter
 
