@@ -2,6 +2,7 @@ package cpu
 
 import (
 	"fmt"
+	"log/slog"
 
 	utils "github.com/Keisim/go-riscv-emu/pkg/utils"
 )
@@ -42,12 +43,15 @@ func ParseIType(instruction uint32) ITypeInstruction {
 
 // Addi executes the ADDI instruction on the given core.
 func Addi(core *Core, instr ITypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing ADDI instruction: %+v\n", instr))
 	core.x[instr.rd] = core.x[instr.rs1] + uint32(instr.imm)
+	core.pc += 4
 	return nil
 }
 
 // Jarl executes the JALR instruction on the given core.
 func Jarl(core *Core, instr ITypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing JALR instruction: %+v\n", instr))
 	targetAddress := (core.x[instr.rs1] + uint32(instr.imm)) &^ 1
 	core.x[instr.rd] = core.pc + 4
 	core.pc = targetAddress
