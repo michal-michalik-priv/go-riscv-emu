@@ -12,12 +12,19 @@ const (
 	opcodeAddi = 0b0010011
 	opcodeJalr = 0b1100111
 	opcodeLui  = 0b0110111
+	opcodeSb   = 0b0100011
+	opcodeJal  = 0b1101111
+	opcodeLb   = 0b0000011
+	opcodeLbu  = 0b0000011
 )
 
-// RV32I Funct3 for I-type instructions
+// RV32I Funct3 for all instructions
 const (
 	iTypeFunc3Addi = 0b000
 	iTypeFunc3Jalr = 0b000
+	sTypeFunc3Sb   = 0b000
+	iTypeFunc3Lb   = 0b000
+	iTypeFunc3Lbu  = 0b100
 )
 
 // iTypeInstruction represents a parsed I-type instruction
@@ -30,6 +37,13 @@ type iTypeInstruction struct {
 // uTypeInstruction represents a parsed U-type instruction
 type uTypeInstruction struct {
 	rd  uint32 // Destination register
+	imm int32  // Immediate value
+}
+
+// sTypeInstruction represents a parsed S-type instruction
+type sTypeInstruction struct {
+	rs1 uint32 // Source register 1
+	rs2 uint32 // Source register 2
 	imm int32  // Immediate value
 }
 
@@ -60,6 +74,38 @@ func parseUType(instruction uint32) uTypeInstruction {
 	}
 }
 
+// parseSType parses a 32-bit S-type instruction and returns a
+// sTypeInstruction struct.
+func parseSType(instruction uint32) sTypeInstruction {
+	rs1 := utils.BitsSlice(instruction, 15, 20)
+	rs2 := utils.BitsSlice(instruction, 20, 25)
+	imm4_0 := utils.BitsSlice(instruction, 7, 12)
+	imm11_5 := utils.BitsSlice(instruction, 25, 32)
+	imm := utils.SignExtend((imm11_5<<5)|imm4_0, 12)
+
+	return sTypeInstruction{
+		rs1: rs1,
+		rs2: rs2,
+		imm: imm,
+	}
+}
+
+// parseJType parses a 32-bit J-type instruction and returns a
+// uTypeInstruction struct.
+func parseJType(instruction uint32) uTypeInstruction {
+	rd := utils.BitsSlice(instruction, 7, 12)
+	imm20 := utils.BitsSlice(instruction, 31, 32)
+	imm10_1 := utils.BitsSlice(instruction, 21, 31)
+	imm11 := utils.BitsSlice(instruction, 20, 21)
+	imm19_12 := utils.BitsSlice(instruction, 12, 20)
+	imm := utils.SignExtend((imm20<<20)|(imm19_12<<12)|(imm11<<11)|(imm10_1<<1), 21)
+
+	return uTypeInstruction{
+		rd:  rd,
+		imm: int32(imm),
+	}
+}
+
 // addi executes the ADDI instruction on the given core.
 func addi(core *Core, instr iTypeInstruction) error {
 	slog.Debug(fmt.Sprintf("Executing ADDI instruction: %+v\n", instr))
@@ -85,6 +131,68 @@ func lui(core *Core, instr uTypeInstruction) error {
 	return nil
 }
 
+// sb executes the SB instruction on the given core.
+func sb(core *Core, instr sTypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing SB instruction: %+v\n", instr))
+	address := core.x[instr.rs1] + uint32(instr.imm)
+	value := byte(core.x[instr.rs2] & 0xFF)
+
+	device := core.bus.FindDevice(address)
+	if device == nil {
+		return fmt.Errorf("SB failed: no device found at address 0x%X", address)
+	}
+	err := device.Write(address, value)
+	if err != nil {
+		return fmt.Errorf("SB failed: %v", err)
+	}
+	core.pc += 4
+	return nil
+}
+
+// jal executes the JAL instruction on the given core.
+func jal(core *Core, instr uTypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing JAL instruction: %+v\n", instr))
+	core.x[instr.rd] = core.pc + 4
+	core.pc = core.pc + uint32(instr.imm)
+	return nil
+}
+
+func lb(core *Core, instr iTypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing LB instruction: %+v\n", instr))
+	address := core.x[instr.rs1] + uint32(instr.imm)
+
+	device := core.bus.FindDevice(address)
+	if device == nil {
+		return fmt.Errorf("LB failed: no device found at address 0x%X", address)
+	}
+	value, err := device.Read(address)
+	if err != nil {
+		return fmt.Errorf("LB failed: %v", err)
+	}
+
+	core.x[instr.rd] = uint32(utils.SignExtend(uint32(value), 8))
+	core.pc += 4
+	return nil
+}
+
+func lbu(core *Core, instr iTypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing LBU instruction: %+v\n", instr))
+	address := core.x[instr.rs1] + uint32(instr.imm)
+
+	device := core.bus.FindDevice(address)
+	if device == nil {
+		return fmt.Errorf("LBU failed: no device found at address 0x%X", address)
+	}
+	value, err := device.Read(address)
+	if err != nil {
+		return fmt.Errorf("LBU failed: %v", err)
+	}
+
+	core.x[instr.rd] = uint32(value)
+	core.pc += 4
+	return nil
+}
+
 // Parse parses a 32-bit instruction word and returns the corresponding
 // instruction struct based on the opcode and funct3 fields.
 func execute(core *Core, instruction uint32) error {
@@ -98,6 +206,14 @@ func execute(core *Core, instruction uint32) error {
 		return jarl(core, parseIType(instruction))
 	case opcode == opcodeLui: // TODO: We might check that before slicing func3
 		return lui(core, parseUType(instruction))
+	case opcode == opcodeJal:
+		return jal(core, parseJType(instruction))
+	case opcode == opcodeSb && func3 == sTypeFunc3Sb:
+		return sb(core, parseSType(instruction))
+	case opcode == opcodeLb && func3 == iTypeFunc3Lb:
+		return lb(core, parseIType(instruction))
+	case opcode == opcodeLbu && func3 == iTypeFunc3Lbu:
+		return lbu(core, parseIType(instruction))
 
 	default:
 		return fmt.Errorf("unsupported instruction, %032b", instruction)
