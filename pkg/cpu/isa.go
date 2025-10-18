@@ -56,6 +56,12 @@ type bTypeInstruction struct {
 	imm int32  // Immediate value
 }
 
+// jTypeInstruction represents a parsed J-type instruction
+type jTypeInstruction struct {
+	rd  uint32 // Destination register
+	imm int32  // Immediate value
+}
+
 // parseIType parses a 32-bit I-type instruction and returns an
 // iTypeInstruction struct.
 func parseIType(instruction uint32) iTypeInstruction {
@@ -100,8 +106,8 @@ func parseSType(instruction uint32) sTypeInstruction {
 }
 
 // parseJType parses a 32-bit J-type instruction and returns a
-// uTypeInstruction struct.
-func parseJType(instruction uint32) uTypeInstruction {
+// jTypeInstruction struct.
+func parseJType(instruction uint32) jTypeInstruction {
 	rd := utils.BitsSlice(instruction, 7, 12)
 	imm20 := utils.BitsSlice(instruction, 31, 32)
 	imm10_1 := utils.BitsSlice(instruction, 21, 31)
@@ -109,7 +115,7 @@ func parseJType(instruction uint32) uTypeInstruction {
 	imm19_12 := utils.BitsSlice(instruction, 12, 20)
 	imm := utils.SignExtend((imm20<<20)|(imm19_12<<12)|(imm11<<11)|(imm10_1<<1), 21)
 
-	return uTypeInstruction{
+	return jTypeInstruction{
 		rd:  rd,
 		imm: int32(imm),
 	}
@@ -184,7 +190,7 @@ func sb(core *Core, instr sTypeInstruction) error {
 }
 
 // jal executes the JAL instruction on the given core.
-func jal(core *Core, instr uTypeInstruction) error {
+func jal(core *Core, instr jTypeInstruction) error {
 	slog.Debug(fmt.Sprintf("Executing JAL instruction: %+v\n", instr))
 	core.x[instr.rd] = core.pc + 4
 	core.pc = core.pc + uint32(instr.imm)

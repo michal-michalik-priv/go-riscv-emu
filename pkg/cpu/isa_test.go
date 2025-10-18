@@ -218,7 +218,7 @@ func TestJal(t *testing.T) {
 	core := NewCore(&devices.Bus{})
 	core.pc = 0x4000 // Set initial program counter
 
-	instr := uTypeInstruction{
+	instr := jTypeInstruction{
 		rd:  5,     // Destination register x5
 		imm: 0x200, // Immediate offset
 	}
