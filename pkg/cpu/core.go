@@ -1,6 +1,9 @@
 package cpu
 
 import (
+	"fmt"
+	"log/slog"
+
 	"github.com/Keisim/go-riscv-emu/pkg/devices"
 )
 
@@ -32,6 +35,7 @@ func (c *Core) GetPc() uint32 {
 
 // Fetch retrieves the next instruction from memory at the current PC.
 func (c *Core) Fetch() uint32 {
+	slog.Debug(fmt.Sprintf("Fetching instruction at PC: %X", c.pc))
 	device := c.bus.FindDevice(c.pc)
 	if device == nil {
 		panic("No device found at PC address")
