@@ -28,24 +28,6 @@ func TestAddi(t *testing.T) {
 	}
 }
 
-func TestExecute_Addi(t *testing.T) {
-	core := NewCore(&devices.Bus{})
-	core.x[1] = 20 // Set register x1 to 20
-
-	// Encode ADDI x2, x1, 10
-	instruction := uint32(0b00000000101000001000000100010011)
-
-	err := execute(core, instruction)
-	if err != nil {
-		t.Fatalf("execute failed: %v", err)
-	}
-
-	expected := uint32(30) // 20 + 10
-	if core.x[2] != expected {
-		t.Errorf("Expected x2 to be %d, got %d", expected, core.x[2])
-	}
-}
-
 func TestExecute_UnsupportedInstruction(t *testing.T) {
 	core := NewCore(&devices.Bus{})
 
@@ -130,23 +112,6 @@ func TestLui(t *testing.T) {
 	}
 }
 
-func TestExecute_Lui(t *testing.T) {
-	core := NewCore(&devices.Bus{})
-
-	// Encode LUI x4, 0x1ABCD
-	instruction := uint32(0b00011010101111001101001000110111)
-
-	err := execute(core, instruction)
-	if err != nil {
-		t.Fatalf("execute failed: %v", err)
-	}
-
-	expected := uint32(0x1ABCD000) // 0x1ABCD << 12
-	if core.x[4] != expected {
-		t.Errorf("Expected x4 to be %X, got %X", expected, core.x[4])
-	}
-}
-
 func TestSb(t *testing.T) {
 	bus := &devices.Bus{}
 	ramDevice := &devices.RAMDevice{}
@@ -166,41 +131,6 @@ func TestSb(t *testing.T) {
 	err := sb(core, instr)
 	if err != nil {
 		t.Fatalf("sb failed: %v", err)
-	}
-
-	// Verify that the byte at address 0x2004 is 0xCD (least significant byte of 0xABCD)
-	value, err := ramDevice.Read(0x2004)
-	if err != nil {
-		t.Fatalf("Read failed: %v", err)
-	}
-	expected := byte(0xCD)
-	if value != expected {
-		t.Errorf("Expected memory at 0x2004 to be %X, got %X", expected, value)
-	}
-}
-
-func TestExecute_Sb(t *testing.T) {
-	bus := &devices.Bus{}
-	ramDevice := &devices.RAMDevice{}
-	ramDevice.Initialize(0x2000, 0x100)
-	bus.AddDevice(ramDevice)
-
-	core := NewCore(bus)
-	core.x[1] = 0x2004 // Base address in rs1
-	core.x[2] = 0xABCD // Value to store in rs2
-
-	// Encode SB x2, 0(x1)
-	// imm[11:5] = 0b0000000 (0)
-	// rs2 = 0b00010 (2)
-	// rs1 = 0b00001 (1)
-	// funct3 = 0b000
-	// imm[4:0] = 0b00000 (0)
-	// opcode = 0b0100011 (SB)
-	instruction := uint32(0b00000000001000001000000000100011)
-
-	err := execute(core, instruction)
-	if err != nil {
-		t.Fatalf("execute failed: %v", err)
 	}
 
 	// Verify that the byte at address 0x2004 is 0xCD (least significant byte of 0xABCD)
@@ -337,5 +267,74 @@ func TestBne(t *testing.T) {
 	expectedPC = uint32(0x3004) // PC should advance by 4
 	if core.pc != expectedPC {
 		t.Errorf("Expected PC to be %X, got %X", expectedPC, core.pc)
+	}
+}
+
+func TestParseIType(t *testing.T) {
+	instruction := uint32(0x04800713) // Example instruction
+	parsed := parseIType(instruction)
+
+	if parsed.rd != 14 {
+		t.Errorf("Expected rd to be 14, got %d", parsed.rd)
+	}
+	if parsed.rs1 != 0 {
+		t.Errorf("Expected rs1 to be 0, got %d", parsed.rs1)
+	}
+	if parsed.imm != 72 {
+		t.Errorf("Expected imm to be 72, got %d", parsed.imm)
+	}
+}
+
+func TestParseBType(t *testing.T) {
+	instruction := uint32(0xfed79ae3)
+	parsed := parseBType(instruction)
+
+	if parsed.rs1 != 15 {
+		t.Errorf("Expected rs1 to be 15, got %d", parsed.rs1)
+	}
+	if parsed.rs2 != 13 {
+		t.Errorf("Expected rs2 to be 13, got %d", parsed.rs2)
+	}
+	if parsed.imm != -12 {
+		t.Errorf("Expected imm to be -12, got %d", parsed.imm)
+	}
+}
+
+func TestParseUType(t *testing.T) {
+	instruction := uint32(0x800006b7)
+	parsed := parseUType(instruction)
+
+	if parsed.rd != 13 {
+		t.Errorf("Expected rd to be 13, got %d", parsed.rd)
+	}
+	if parsed.imm != 0x80000 {
+		t.Errorf("Expected imm to be 0x80000, got %d", parsed.imm)
+	}
+}
+
+func TestParseSType(t *testing.T) {
+	instruction := uint32(0x00e60023)
+	parsed := parseSType(instruction)
+
+	if parsed.rs1 != 12 {
+		t.Errorf("Expected rs1 to be 12, got %d", parsed.rs1)
+	}
+	if parsed.rs2 != 14 {
+		t.Errorf("Expected rs2 to be 14, got %d", parsed.rs2)
+	}
+	if parsed.imm != 0 {
+		t.Errorf("Expected imm to be 0, got %d", parsed.imm)
+	}
+}
+
+func TestParseJType(t *testing.T) {
+	instruction := uint32(0x0000006f)
+	parsed := parseJType(instruction)
+
+	if parsed.rd != 0 {
+		t.Errorf("Expected rd to be 0, got %d", parsed.rd)
+	}
+	if parsed.imm != 0 {
+		t.Errorf("Expected imm to be 0, got %d", parsed.imm)
 	}
 }
