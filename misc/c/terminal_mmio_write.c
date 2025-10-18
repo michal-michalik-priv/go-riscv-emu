@@ -3,7 +3,7 @@
 // After compilation you can check the output with:
 //   riscv64-unknown-elf-objdump -d -M no-aliases terminal_mmio_write.o
 int main() {
-    char *p = (char *)0x1000;
+    char *p = (char *)0x10000000;
     *p = 'A';
-    return 0;
+    while(1);
 }
