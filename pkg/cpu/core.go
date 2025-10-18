@@ -4,12 +4,14 @@ import (
 	"github.com/Keisim/go-riscv-emu/pkg/devices"
 )
 
+// Core represents the CPU core with its registers and program counter.
 type Core struct {
 	pc  uint32
 	x   [32]uint32
 	bus *devices.Bus
 }
 
+// NewCore creates and initializes a new CPU core with the given bus.
 func NewCore(bus *devices.Bus) *Core {
 	return &Core{
 		pc:  0,
@@ -18,14 +20,17 @@ func NewCore(bus *devices.Bus) *Core {
 	}
 }
 
+// SetPc sets the program counter to the specified value.
 func (c *Core) SetPc(value uint32) {
 	c.pc = value
 }
 
+// GetPc returns the current value of the program counter.
 func (c *Core) GetPc() uint32 {
 	return c.pc
 }
 
+// Fetch retrieves the next instruction from memory at the current PC.
 func (c *Core) Fetch() uint32 {
 	device := c.bus.FindDevice(c.pc)
 	if device == nil {
