@@ -16,6 +16,7 @@ const (
 	opcodeJal  = 0b1101111
 	opcodeLb   = 0b0000011
 	opcodeLbu  = 0b0000011
+	opcodeBne  = 0b1100011
 )
 
 // RV32I Funct3 for all instructions
@@ -25,6 +26,7 @@ const (
 	sTypeFunc3Sb   = 0b000
 	iTypeFunc3Lb   = 0b000
 	iTypeFunc3Lbu  = 0b100
+	bTypeFunc3Bne  = 0b001
 )
 
 // iTypeInstruction represents a parsed I-type instruction
@@ -119,6 +121,31 @@ func parseJType(instruction uint32) jTypeInstruction {
 	}
 }
 
+// parseBType parses a 32-bit B-type instruction and returns a
+// bTypeInstruction struct.
+func parseBType(instruction uint32) bTypeInstruction {
+	rs1 := utils.BitsSlice(instruction, 15, 20)
+	rs2 := utils.BitsSlice(instruction, 20, 25)
+	// Extract immediate bits according to RISC-V B-type format
+	imm12 := utils.BitsSlice(instruction, 31, 32)   // instruction[31] -> imm[12]
+	imm11 := utils.BitsSlice(instruction, 7, 8)     // instruction[7] -> imm[11]
+	imm10_5 := utils.BitsSlice(instruction, 25, 31) // instruction[30:25] -> imm[10:5]
+	imm4_1 := utils.BitsSlice(instruction, 8, 12)   // instruction[11:8] -> imm[4:1]
+
+	// Assemble the 13-bit immediate value (imm[0] is implicitly 0)
+	// imm = {imm[12], imm[11], imm[10:5], imm[4:1], 0}
+	assembled_imm := (imm12 << 12) | (imm11 << 11) | (imm10_5 << 5) | (imm4_1 << 1)
+
+	// Sign extend the 13-bit immediate value
+	imm := utils.SignExtend(assembled_imm, 13)
+
+	return bTypeInstruction{
+		rs1: rs1,
+		rs2: rs2,
+		imm: imm,
+	}
+}
+
 // addi executes the ADDI instruction on the given core.
 func addi(core *Core, instr iTypeInstruction) error {
 	slog.Debug(fmt.Sprintf("Executing ADDI instruction: %+v\n", instr))
@@ -206,6 +233,16 @@ func lbu(core *Core, instr iTypeInstruction) error {
 	return nil
 }
 
+func bne(core *Core, instr bTypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing BNE instruction: %+v\n", instr))
+	if core.x[instr.rs1] != core.x[instr.rs2] {
+		core.pc = core.pc + uint32(instr.imm)
+	} else {
+		core.pc += 4
+	}
+	return nil
+}
+
 // Parse parses a 32-bit instruction word and returns the corresponding
 // instruction struct based on the opcode and funct3 fields.
 func execute(core *Core, instruction uint32) error {
@@ -227,6 +264,8 @@ func execute(core *Core, instruction uint32) error {
 		return lb(core, parseIType(instruction))
 	case opcode == opcodeLbu && func3 == iTypeFunc3Lbu:
 		return lbu(core, parseIType(instruction))
+	case opcode == opcodeBne && func3 == bTypeFunc3Bne:
+		return bne(core, parseBType(instruction))
 
 	default:
 		return fmt.Errorf("unsupported instruction, %032b", instruction)
