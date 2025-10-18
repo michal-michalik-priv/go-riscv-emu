@@ -88,3 +88,25 @@ func TestJalr(t *testing.T) {
 		t.Errorf("Expected x2 to be %X, got %X", expectedReturnAddr, core.x[2])
 	}
 }
+
+func TestStep(t *testing.T) {
+	bus := &devices.Bus{}
+	ramDevice := &devices.RAMDevice{}
+	ramDevice.Initialize(0x1000, 0x100)
+	bus.AddDevice(ramDevice)
+
+	core := NewCore(bus)
+	core.pc = 0x1000
+
+	// Load an ADDI instruction into memory at address 0x1000
+	// ADDI x2, x0, 42  ->  0x02A00093
+	ramDevice.Write(0x1000, 0x93) // opcode and rd
+	ramDevice.Write(0x1001, 0x00) // rs1 and funct3
+	ramDevice.Write(0x1002, 0xA0) // imm[11:4]
+	ramDevice.Write(0x1003, 0x02) // imm[3:0]
+
+	err := Step(core)
+	if err != nil {
+		t.Fatalf("Step failed: %v", err)
+	}
+}

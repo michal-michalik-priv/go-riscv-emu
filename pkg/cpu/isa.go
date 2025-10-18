@@ -70,3 +70,13 @@ func Execute(core *Core, instruction uint32) error {
 		return fmt.Errorf("unsupported instruction, %032b", instruction)
 	}
 }
+
+// Step fetches and executes the next instruction for the given core.
+func Step(core *Core) error {
+	instruction := core.Fetch()
+	err := Execute(core, instruction)
+	if err != nil {
+		return err
+	}
+	return nil
+}
