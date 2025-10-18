@@ -302,3 +302,40 @@ func TestLbu(t *testing.T) {
 		t.Errorf("Expected x3 to be %X, got %X", expected, core.x[3])
 	}
 }
+
+func TestBne(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	core.pc = 0x3000 // Set initial program counter
+	core.x[1] = 10   // Set register x1
+	core.x[2] = 20   // Set register x2
+
+	instr := bTypeInstruction{
+		rs1: 1,     // Source register x1
+		rs2: 2,     // Source register x2
+		imm: 0x100, // Immediate offset
+	}
+
+	err := bne(core, instr)
+	if err != nil {
+		t.Fatalf("bne failed: %v", err)
+	}
+
+	expectedPC := uint32(0x3100) // 0x3000 + 0x100
+	if core.pc != expectedPC {
+		t.Errorf("Expected PC to be %X, got %X", expectedPC, core.pc)
+	}
+
+	// Now test when registers are equal
+	core.pc = 0x3000 // Reset program counter
+	core.x[2] = 10   // Set register x2 equal to x1
+
+	err = bne(core, instr)
+	if err != nil {
+		t.Fatalf("bne failed: %v", err)
+	}
+
+	expectedPC = uint32(0x3004) // PC should advance by 4
+	if core.pc != expectedPC {
+		t.Errorf("Expected PC to be %X, got %X", expectedPC, core.pc)
+	}
+}
