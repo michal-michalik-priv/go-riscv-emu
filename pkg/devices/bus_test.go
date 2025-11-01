@@ -44,6 +44,43 @@ func setupBusFixture() *Bus {
 	return bus
 }
 
+func TestBus_ReadWrite(t *testing.T) {
+	bus := setupBusFixture()
+	address := uint32(0x1010)
+	value := byte(0xAB)
+
+	// Write to the bus
+	err := bus.Write(address, value)
+	if err != nil {
+		t.Fatalf("bus.Write failed: %v", err)
+	}
+
+	// Read back from the bus
+	readValue, err := bus.Read(address)
+	if err != nil {
+		t.Fatalf("bus.Read failed: %v", err)
+	}
+
+	if readValue != value {
+		t.Errorf("Expected to read %X, but got %X", value, readValue)
+	}
+}
+
+func TestBus_ReadWrite_NoDevice(t *testing.T) {
+	bus := setupBusFixture()
+	address := uint32(0x2000) // Address with no device
+
+	_, err := bus.Read(address)
+	if err == nil {
+		t.Error("Expected an error when reading from an address with no device, but got nil")
+	}
+
+	err = bus.Write(address, 0xFF)
+	if err == nil {
+		t.Error("Expected an error when writing to an address with no device, but got nil")
+	}
+}
+
 func TestBusReadWrite(t *testing.T) {
 	bus := setupBusFixture()
 

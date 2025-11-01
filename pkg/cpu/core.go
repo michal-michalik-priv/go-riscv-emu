@@ -36,15 +36,11 @@ func (c *Core) GetPc() uint32 {
 // Fetch retrieves the next instruction from memory at the current PC.
 func (c *Core) Fetch() uint32 {
 	slog.Debug(fmt.Sprintf("Fetching instruction at PC: %X", c.pc))
-	device := c.bus.FindDevice(c.pc)
-	if device == nil {
-		panic("No device found at PC address")
-	}
 
-	byte1, _ := device.Read(c.pc)
-	byte2, _ := device.Read(c.pc + 1)
-	byte3, _ := device.Read(c.pc + 2)
-	byte4, _ := device.Read(c.pc + 3)
+	byte1, _ := c.bus.Read(c.pc)
+	byte2, _ := c.bus.Read(c.pc + 1)
+	byte3, _ := c.bus.Read(c.pc + 2)
+	byte4, _ := c.bus.Read(c.pc + 3)
 
 	instruction := uint32(byte1) | (uint32(byte2) << 8) |
 		(uint32(byte3) << 16) | (uint32(byte4) << 24)
