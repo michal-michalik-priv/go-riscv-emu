@@ -177,11 +177,7 @@ func sb(core *Core, instr sTypeInstruction) error {
 	address := core.x[instr.rs1] + uint32(instr.imm)
 	value := byte(core.x[instr.rs2] & 0xFF)
 
-	device := core.bus.FindDevice(address)
-	if device == nil {
-		return fmt.Errorf("SB failed: no device found at address 0x%X", address)
-	}
-	err := device.Write(address, value)
+	err := core.bus.Write(address, value)
 	if err != nil {
 		return fmt.Errorf("SB failed: %v", err)
 	}
@@ -201,11 +197,7 @@ func lb(core *Core, instr iTypeInstruction) error {
 	slog.Debug(fmt.Sprintf("Executing LB instruction: %+v\n", instr))
 	address := core.x[instr.rs1] + uint32(instr.imm)
 
-	device := core.bus.FindDevice(address)
-	if device == nil {
-		return fmt.Errorf("LB failed: no device found at address 0x%X", address)
-	}
-	value, err := device.Read(address)
+	value, err := core.bus.Read(address)
 	if err != nil {
 		return fmt.Errorf("LB failed: %v", err)
 	}
@@ -219,11 +211,7 @@ func lbu(core *Core, instr iTypeInstruction) error {
 	slog.Debug(fmt.Sprintf("Executing LBU instruction: %+v\n", instr))
 	address := core.x[instr.rs1] + uint32(instr.imm)
 
-	device := core.bus.FindDevice(address)
-	if device == nil {
-		return fmt.Errorf("LBU failed: no device found at address 0x%X", address)
-	}
-	value, err := device.Read(address)
+	value, err := core.bus.Read(address)
 	if err != nil {
 		return fmt.Errorf("LBU failed: %v", err)
 	}

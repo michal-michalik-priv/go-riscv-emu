@@ -1,5 +1,7 @@
 package devices
 
+import "fmt"
+
 // BusDevice represents a memory-mapped I/O device.
 type BusDevice interface {
 	Initialize(baseAddress, size uint32)
@@ -28,4 +30,22 @@ func (Bus *Bus) FindDevice(address uint32) BusDevice {
 		}
 	}
 	return nil
+}
+
+// Read from Bus device
+func (Bus *Bus) Read(address uint32) (byte, error) {
+	device := Bus.FindDevice(address)
+	if device == nil {
+		return 0, fmt.Errorf("device not found for address %X read", address)
+	}
+	return device.Read(address)
+}
+
+// Write to Bus device
+func (Bus *Bus) Write(address uint32, value byte) error {
+	device := Bus.FindDevice(address)
+	if device == nil {
+		return fmt.Errorf("device not found for address %X write", address)
+	}
+	return device.Write(address, value)
 }
