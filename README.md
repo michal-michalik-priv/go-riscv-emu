@@ -18,7 +18,7 @@ To run the emulator, you will need to have Go installed on your system.
 2. **Run an example program:**
    (Assuming you have a RISC-V ELF binary, e.g., `misc/c/terminal_mmio_write.o`)
    ```bash
-   ./go-riscv-emu misc/c/terminal_mmio_write.o
+   ./go-riscv-emu -dummy-tty -elf misc/c/terminal_mmio_write.o
    ```
    Replace `misc/c/terminal_mmio_write.o` with the path to your RISC-V ELF binary.
 
