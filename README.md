@@ -32,7 +32,7 @@ To run the emulator, you will need to have Go installed on your system.
     -elf string
             Path to the ELF file to load (default "misc/c/empty_main.o")
     -steps int
-            Number of steps to execute (default 2)
+            Number of steps to execute (0 for infinite, default)
    ```
 
 ## Author

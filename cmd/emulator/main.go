@@ -11,7 +11,7 @@ import (
 func main() {
 	debug := flag.Bool("debug", false, "Enable debug logging")
 	elfPath := flag.String("elf", "misc/c/empty_main.o", "Path to the ELF file to load")
-	steps := flag.Int("steps", 2, "Number of steps to execute")
+	steps := flag.Int("steps", 0, "Number of steps to execute (0 for infinite, default)")
 	dummyTTY := flag.Bool("dummy-tty", false, "Enable Dummy TTY device")
 	flag.Parse()
 
@@ -29,7 +29,13 @@ func main() {
 	}
 	slog.Info("Emulator initialized with ELF file. Starting execution...")
 
-	for i := 0; i < *steps; i++ {
-		system.Step()
+	if *steps == 0 {
+		for {
+			system.Step()
+		}
+	} else {
+		for i := 0; i < *steps; i++ {
+			system.Step()
+		}
 	}
 }
