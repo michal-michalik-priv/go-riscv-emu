@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/Keisim/go-riscv-emu/pkg/devices"
+	"github.com/michal-michalik-priv/go-riscv-emu/pkg/devices"
 )
 
 // Core represents the CPU core with its registers and program counter.

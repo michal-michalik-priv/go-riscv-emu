@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	utils "github.com/Keisim/go-riscv-emu/pkg/utils"
+	utils "github.com/michal-michalik-priv/go-riscv-emu/pkg/utils"
 )
 
 // RV32I Instruction opcodes

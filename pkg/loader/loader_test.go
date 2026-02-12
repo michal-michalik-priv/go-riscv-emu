@@ -3,7 +3,7 @@ package loader
 import (
 	"testing"
 
-	"github.com/Keisim/go-riscv-emu/pkg/system"
+	"github.com/michal-michalik-priv/go-riscv-emu/pkg/system"
 )
 
 func TestLoadELFToSystem(t *testing.T) {

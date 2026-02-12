@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Keisim/go-riscv-emu/pkg/devices"
+	"github.com/michal-michalik-priv/go-riscv-emu/pkg/devices"
 )
 
 func TestAddi(t *testing.T) {

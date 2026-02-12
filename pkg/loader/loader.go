@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/Keisim/go-riscv-emu/pkg/system"
+	"github.com/michal-michalik-priv/go-riscv-emu/pkg/system"
 )
 
 // LoadELFToSystem loads an ELF file from the specified file path into the

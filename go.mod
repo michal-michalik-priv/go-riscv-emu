@@ -1,3 +1,3 @@
-module github.com/Keisim/go-riscv-emu
+module github.com/michal-michalik-priv/go-riscv-emu
 
 go 1.25.3

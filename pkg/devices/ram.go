@@ -3,7 +3,7 @@ package devices
 import (
 	"fmt"
 
-	"github.com/Keisim/go-riscv-emu/pkg/memory"
+	"github.com/michal-michalik-priv/go-riscv-emu/pkg/memory"
 )
 
 // RAMDevice represents a block of RAM accessible via MMIO.

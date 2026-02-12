@@ -4,8 +4,8 @@ import (
 	"flag"
 	"log/slog"
 
-	"github.com/Keisim/go-riscv-emu/pkg/loader"
-	"github.com/Keisim/go-riscv-emu/pkg/system"
+	"github.com/michal-michalik-priv/go-riscv-emu/pkg/loader"
+	"github.com/michal-michalik-priv/go-riscv-emu/pkg/system"
 )
 
 func main() {

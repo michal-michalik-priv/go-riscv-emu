@@ -3,8 +3,8 @@ package system
 import (
 	"log/slog"
 
-	"github.com/Keisim/go-riscv-emu/pkg/cpu"
-	"github.com/Keisim/go-riscv-emu/pkg/devices"
+	"github.com/michal-michalik-priv/go-riscv-emu/pkg/cpu"
+	"github.com/michal-michalik-priv/go-riscv-emu/pkg/devices"
 )
 
 const (
