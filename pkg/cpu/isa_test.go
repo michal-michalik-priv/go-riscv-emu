@@ -106,6 +106,47 @@ func TestExecute_Srli(t *testing.T) {
 	}
 }
 
+func TestAdd(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	core.x[1] = 10
+	core.x[2] = 20
+
+	instr := rTypeInstruction{
+		rd:  3,
+		rs1: 1,
+		rs2: 2,
+	}
+
+	err := add(core, instr)
+	if err != nil {
+		t.Fatalf("add failed: %v", err)
+	}
+
+	expected := uint32(30)
+	if core.x[3] != expected {
+		t.Errorf("Expected x3 to be %d, got %d", expected, core.x[3])
+	}
+}
+
+func TestExecute_Add(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	core.x[1] = 10
+	core.x[2] = 20
+
+	// ADD x3, x1, x2 -> 0x002081B3
+	instruction := uint32(0x002081B3)
+
+	err := execute(core, instruction)
+	if err != nil {
+		t.Fatalf("execute failed: %v", err)
+	}
+
+	expected := uint32(30)
+	if core.x[3] != expected {
+		t.Errorf("Expected x3 to be %d, got %d", expected, core.x[3])
+	}
+}
+
 func TestExecute_UnsupportedInstruction(t *testing.T) {
 	core := NewCore(&devices.Bus{})
 
@@ -866,5 +907,24 @@ func TestParseJType(t *testing.T) {
 	}
 	if parsed.imm != 0 {
 		t.Errorf("Expected imm to be 0, got %d", parsed.imm)
+	}
+}
+
+func TestParseRType(t *testing.T) {
+	// ADD x3, x1, x2 -> 0x002081B3
+	instruction := uint32(0x002081B3)
+	parsed := parseRType(instruction)
+
+	if parsed.rd != 3 {
+		t.Errorf("Expected rd to be 3, got %d", parsed.rd)
+	}
+	if parsed.rs1 != 1 {
+		t.Errorf("Expected rs1 to be 1, got %d", parsed.rs1)
+	}
+	if parsed.rs2 != 2 {
+		t.Errorf("Expected rs2 to be 2, got %d", parsed.rs2)
+	}
+	if parsed.func7 != 0 {
+		t.Errorf("Expected func7 to be 0, got %d", parsed.func7)
 	}
 }

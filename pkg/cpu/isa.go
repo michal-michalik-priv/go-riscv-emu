@@ -18,6 +18,7 @@ const (
 	opcodeLb     = 0b0000011
 	opcodeLbu    = 0b0000011
 	opcodeBne    = 0b1100011
+	opcodeOp     = 0b0110011
 	opcodeSystem = 0b1110011
 )
 
@@ -34,6 +35,7 @@ const (
 	bTypeFunc3Bne      = 0b001
 	bTypeFunc3Blt      = 0b100
 	bTypeFunc3Bltu     = 0b110
+	rTypeFunc3Add      = 0b000
 	iTypeFunc3Csrrw    = 0b001
 	iTypeFunc3Csrrs    = 0b010
 	iTypeFunc3Csrrwi   = 0b101
@@ -43,6 +45,11 @@ const (
 const (
 	privImmSret = 0x102
 	privImmMret = 0x302
+)
+
+// RV32I Funct7 for all instructions
+const (
+	rTypeFunc7Add = 0b0000000
 )
 
 // RISC-V CSR addresses
@@ -84,6 +91,14 @@ type bTypeInstruction struct {
 type jTypeInstruction struct {
 	rd  uint32 // Destination register
 	imm int32  // Immediate value
+}
+
+// rTypeInstruction represents a parsed R-type instruction
+type rTypeInstruction struct {
+	rd    uint32 // Destination register
+	rs1   uint32 // Source register 1
+	rs2   uint32 // Source register 2
+	func7 uint32 // Funct7 field
 }
 
 // parseIType parses a 32-bit I-type instruction and returns an
@@ -168,6 +183,31 @@ func parseBType(instruction uint32) bTypeInstruction {
 		rs2: rs2,
 		imm: imm,
 	}
+}
+
+// parseRType parses a 32-bit R-type instruction and returns an
+// rTypeInstruction struct.
+func parseRType(instruction uint32) rTypeInstruction {
+	rd := utils.BitsSlice(instruction, 7, 12)
+	rs1 := utils.BitsSlice(instruction, 15, 20)
+	rs2 := utils.BitsSlice(instruction, 20, 25)
+	func7 := utils.BitsSlice(instruction, 25, 32)
+
+	return rTypeInstruction{
+		rd:    rd,
+		rs1:   rs1,
+		rs2:   rs2,
+		func7: func7,
+	}
+}
+
+// add executes the ADD instruction on the given core.
+func add(core *Core, instr rTypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing ADD instruction: %+v\n", instr))
+	val := core.GetRegister(int(instr.rs1)) + core.GetRegister(int(instr.rs2))
+	core.SetRegister(int(instr.rd), val)
+	core.pc += 4
+	return nil
 }
 
 // addi executes the ADDI instruction on the given core.
@@ -433,6 +473,12 @@ func execute(core *Core, instruction uint32) error {
 		return blt(core, parseBType(instruction))
 	case opcode == opcodeBne && func3 == bTypeFunc3Bltu:
 		return bltu(core, parseBType(instruction))
+	case opcode == opcodeOp && func3 == rTypeFunc3Add:
+		instr := parseRType(instruction)
+		if instr.func7 == rTypeFunc7Add {
+			return add(core, instr)
+		}
+		return fmt.Errorf("unsupported R-type instruction, %032b", instruction)
 	case opcode == opcodeSystem && func3 == 0:
 		instr := parseIType(instruction)
 		switch instr.imm {
