@@ -151,7 +151,8 @@ func parseBType(instruction uint32) bTypeInstruction {
 // addi executes the ADDI instruction on the given core.
 func addi(core *Core, instr iTypeInstruction) error {
 	slog.Debug(fmt.Sprintf("Executing ADDI instruction: %+v\n", instr))
-	core.x[instr.rd] = core.x[instr.rs1] + uint32(instr.imm)
+	val := core.GetRegister(int(instr.rs1)) + uint32(instr.imm)
+	core.SetRegister(int(instr.rd), val)
 	core.pc += 4
 	return nil
 }
@@ -159,8 +160,8 @@ func addi(core *Core, instr iTypeInstruction) error {
 // jarl executes the JALR instruction on the given core.
 func jarl(core *Core, instr iTypeInstruction) error {
 	slog.Debug(fmt.Sprintf("Executing JALR instruction: %+v\n", instr))
-	targetAddress := (core.x[instr.rs1] + uint32(instr.imm)) &^ 1
-	core.x[instr.rd] = core.pc + 4
+	targetAddress := (core.GetRegister(int(instr.rs1)) + uint32(instr.imm)) &^ 1
+	core.SetRegister(int(instr.rd), core.pc+4)
 	core.pc = targetAddress
 	return nil
 }
@@ -168,7 +169,7 @@ func jarl(core *Core, instr iTypeInstruction) error {
 // lui executes the LUI instruction on the given core.
 func lui(core *Core, instr uTypeInstruction) error {
 	slog.Debug(fmt.Sprintf("Executing LUI instruction: %+v\n", instr))
-	core.x[instr.rd] = uint32(instr.imm) << 12
+	core.SetRegister(int(instr.rd), uint32(instr.imm)<<12)
 	core.pc += 4
 	return nil
 }
@@ -176,8 +177,8 @@ func lui(core *Core, instr uTypeInstruction) error {
 // sb executes the SB instruction on the given core.
 func sb(core *Core, instr sTypeInstruction) error {
 	slog.Debug(fmt.Sprintf("Executing SB instruction: %+v\n", instr))
-	address := core.x[instr.rs1] + uint32(instr.imm)
-	value := byte(core.x[instr.rs2] & 0xFF)
+	address := core.GetRegister(int(instr.rs1)) + uint32(instr.imm)
+	value := byte(core.GetRegister(int(instr.rs2)) & 0xFF)
 
 	err := core.bus.Write(address, value)
 	if err != nil {
@@ -190,7 +191,7 @@ func sb(core *Core, instr sTypeInstruction) error {
 // jal executes the JAL instruction on the given core.
 func jal(core *Core, instr jTypeInstruction) error {
 	slog.Debug(fmt.Sprintf("Executing JAL instruction: %+v\n", instr))
-	core.x[instr.rd] = core.pc + 4
+	core.SetRegister(int(instr.rd), core.pc+4)
 	core.pc = core.pc + uint32(instr.imm)
 	return nil
 }
@@ -198,14 +199,14 @@ func jal(core *Core, instr jTypeInstruction) error {
 // lb executes the LB instruction on the given core.
 func lb(core *Core, instr iTypeInstruction) error {
 	slog.Debug(fmt.Sprintf("Executing LB instruction: %+v\n", instr))
-	address := core.x[instr.rs1] + uint32(instr.imm)
+	address := core.GetRegister(int(instr.rs1)) + uint32(instr.imm)
 
 	value, err := core.bus.Read(address)
 	if err != nil {
 		return fmt.Errorf("LB failed: %v", err)
 	}
 
-	core.x[instr.rd] = uint32(utils.SignExtend(uint32(value), 8))
+	core.SetRegister(int(instr.rd), uint32(utils.SignExtend(uint32(value), 8)))
 	core.pc += 4
 	return nil
 }
@@ -213,14 +214,14 @@ func lb(core *Core, instr iTypeInstruction) error {
 // lbu executes the LBU instruction on the given core.
 func lbu(core *Core, instr iTypeInstruction) error {
 	slog.Debug(fmt.Sprintf("Executing LBU instruction: %+v\n", instr))
-	address := core.x[instr.rs1] + uint32(instr.imm)
+	address := core.GetRegister(int(instr.rs1)) + uint32(instr.imm)
 
 	value, err := core.bus.Read(address)
 	if err != nil {
 		return fmt.Errorf("LBU failed: %v", err)
 	}
 
-	core.x[instr.rd] = uint32(value)
+	core.SetRegister(int(instr.rd), uint32(value))
 	core.pc += 4
 	return nil
 }
@@ -228,7 +229,7 @@ func lbu(core *Core, instr iTypeInstruction) error {
 // bne executes the BNE instruction on the given core.
 func bne(core *Core, instr bTypeInstruction) error {
 	slog.Debug(fmt.Sprintf("Executing BNE instruction: %+v\n", instr))
-	if core.x[instr.rs1] != core.x[instr.rs2] {
+	if core.GetRegister(int(instr.rs1)) != core.GetRegister(int(instr.rs2)) {
 		core.pc = core.pc + uint32(instr.imm)
 	} else {
 		core.pc += 4
@@ -246,12 +247,12 @@ func csrrs(core *Core, instr iTypeInstruction) error {
 
 	// Write old value to destination register
 	if instr.rd != 0 {
-		core.x[instr.rd] = oldValue
+		core.SetRegister(int(instr.rd), oldValue)
 	}
 
 	// If rs1 is not x0, set bits in CSR
 	if instr.rs1 != 0 {
-		core.csrs[csrAddr] = oldValue | core.x[instr.rs1]
+		core.csrs[csrAddr] = oldValue | core.GetRegister(int(instr.rs1))
 	}
 
 	core.pc += 4

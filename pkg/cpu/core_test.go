@@ -26,6 +26,28 @@ func TestGetPc(t *testing.T) {
 	}
 }
 
+func TestSetRegister(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	regIndex := 10 // A0
+	regValue := uint32(0x12345678)
+	core.SetRegister(regIndex, regValue)
+
+	if core.x[regIndex] != regValue {
+		t.Errorf("Expected register %d to be %X, got %X", regIndex, regValue, core.x[regIndex])
+	}
+}
+
+func TestGetRegister(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	regIndex := 10 // A0
+	regValue := uint32(0x87654321)
+	core.x[regIndex] = regValue
+
+	if core.GetRegister(regIndex) != regValue {
+		t.Errorf("Expected register %d to be %X, got %X", regIndex, regValue, core.GetRegister(regIndex))
+	}
+}
+
 type MockDevice struct {
 	memory map[uint32]byte
 }

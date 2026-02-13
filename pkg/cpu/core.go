@@ -35,6 +35,21 @@ func (c *Core) GetPc() uint32 {
 	return c.pc
 }
 
+// SetRegister sets the value of a specific general-purpose register.
+func (c *Core) SetRegister(index int, value uint32) {
+	if index > 0 && index < 32 {
+		c.x[index] = value
+	}
+}
+
+// GetRegister returns the value of a specific general-purpose register.
+func (c *Core) GetRegister(index int) uint32 {
+	if index >= 0 && index < 32 {
+		return c.x[index]
+	}
+	return 0
+}
+
 // Fetch retrieves the next instruction from memory at the current PC.
 func (c *Core) Fetch() uint32 {
 	slog.Debug(fmt.Sprintf("Fetching instruction at PC: %X", c.pc))
