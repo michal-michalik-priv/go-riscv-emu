@@ -23,15 +23,19 @@ const (
 
 // RV32I Funct3 for all instructions
 const (
-	iTypeFunc3Addi   = 0b000
-	iTypeFunc3Jalr   = 0b000
-	sTypeFunc3Sb     = 0b000
-	iTypeFunc3Lb     = 0b000
-	iTypeFunc3Lbu    = 0b100
-	bTypeFunc3Bne    = 0b001
-	iTypeFunc3Csrrw  = 0b001
-	iTypeFunc3Csrrs  = 0b010
-	iTypeFunc3Csrrwi = 0b101
+	iTypeFunc3Addi     = 0b000
+	iTypeFunc3Slli     = 0b001
+	iTypeFunc3SrliSrai = 0b101
+	iTypeFunc3Jalr     = 0b000
+	sTypeFunc3Sb       = 0b000
+	iTypeFunc3Lb       = 0b000
+	iTypeFunc3Lbu      = 0b100
+	bTypeFunc3Bne      = 0b001
+	bTypeFunc3Blt      = 0b100
+	bTypeFunc3Bltu     = 0b110
+	iTypeFunc3Csrrw    = 0b001
+	iTypeFunc3Csrrs    = 0b010
+	iTypeFunc3Csrrwi   = 0b101
 )
 
 // iTypeInstruction represents a parsed I-type instruction
@@ -248,6 +252,48 @@ func bne(core *Core, instr bTypeInstruction) error {
 	return nil
 }
 
+// blt executes the BLT instruction on the given core.
+func blt(core *Core, instr bTypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing BLT instruction: %+v\n", instr))
+	if int32(core.GetRegister(int(instr.rs1))) < int32(core.GetRegister(int(instr.rs2))) {
+		core.pc = core.pc + uint32(instr.imm)
+	} else {
+		core.pc += 4
+	}
+	return nil
+}
+
+// bltu executes the BLTU instruction on the given core.
+func bltu(core *Core, instr bTypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing BLTU instruction: %+v\n", instr))
+	if core.GetRegister(int(instr.rs1)) < core.GetRegister(int(instr.rs2)) {
+		core.pc = core.pc + uint32(instr.imm)
+	} else {
+		core.pc += 4
+	}
+	return nil
+}
+
+// slli executes the SLLI instruction on the given core.
+func slli(core *Core, instr iTypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing SLLI instruction: %+v\n", instr))
+	shamt := uint32(instr.imm) & 0x1F
+	val := core.GetRegister(int(instr.rs1)) << shamt
+	core.SetRegister(int(instr.rd), val)
+	core.pc += 4
+	return nil
+}
+
+// srli executes the SRLI instruction on the given core.
+func srli(core *Core, instr iTypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing SRLI instruction: %+v\n", instr))
+	shamt := uint32(instr.imm) & 0x1F
+	val := core.GetRegister(int(instr.rs1)) >> shamt
+	core.SetRegister(int(instr.rd), val)
+	core.pc += 4
+	return nil
+}
+
 // csrrw executes the CSRRW instruction on the given core.
 func csrrw(core *Core, instr iTypeInstruction) error {
 	slog.Debug(fmt.Sprintf("Executing CSRRW instruction: %+v\n", instr))
@@ -316,6 +362,15 @@ func execute(core *Core, instruction uint32) error {
 	switch {
 	case opcode == opcodeAddi && func3 == iTypeFunc3Addi:
 		return addi(core, parseIType(instruction))
+	case opcode == opcodeAddi && func3 == iTypeFunc3Slli:
+		return slli(core, parseIType(instruction))
+	case opcode == opcodeAddi && func3 == iTypeFunc3SrliSrai:
+		instr := parseIType(instruction)
+		// Check imm[11:5] to distinguish between SRLI and SRAI
+		if (instr.imm >> 5) == 0 {
+			return srli(core, instr)
+		}
+		return fmt.Errorf("unsupported instruction, %032b", instruction)
 	case opcode == opcodeJalr && func3 == iTypeFunc3Jalr:
 		return jarl(core, parseIType(instruction))
 	case opcode == opcodeLui: // TODO: We might check that before slicing func3
@@ -332,6 +387,10 @@ func execute(core *Core, instruction uint32) error {
 		return lbu(core, parseIType(instruction))
 	case opcode == opcodeBne && func3 == bTypeFunc3Bne:
 		return bne(core, parseBType(instruction))
+	case opcode == opcodeBne && func3 == bTypeFunc3Blt:
+		return blt(core, parseBType(instruction))
+	case opcode == opcodeBne && func3 == bTypeFunc3Bltu:
+		return bltu(core, parseBType(instruction))
 	case opcode == opcodeSystem && func3 == iTypeFunc3Csrrw:
 		return csrrw(core, parseIType(instruction))
 	case opcode == opcodeSystem && func3 == iTypeFunc3Csrrwi:

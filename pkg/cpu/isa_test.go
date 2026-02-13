@@ -28,6 +28,84 @@ func TestAddi(t *testing.T) {
 	}
 }
 
+func TestSlli(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	core.x[1] = 2 // Set register x1 to 2
+
+	instr := iTypeInstruction{
+		rd:  2, // Destination register x2
+		rs1: 1, // Source register x1
+		imm: 4, // Shift amount 4
+	}
+
+	err := slli(core, instr)
+	if err != nil {
+		t.Fatalf("slli failed: %v", err)
+	}
+
+	expected := uint32(32) // 2 << 4
+	if core.x[2] != expected {
+		t.Errorf("Expected x2 to be %d, got %d", expected, core.x[2])
+	}
+}
+
+func TestExecute_Slli(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	core.x[1] = 2
+
+	// SLLI x2, x1, 4 -> 0x00409113
+	instruction := uint32(0x00409113)
+
+	err := execute(core, instruction)
+	if err != nil {
+		t.Fatalf("execute failed: %v", err)
+	}
+
+	expected := uint32(32)
+	if core.x[2] != expected {
+		t.Errorf("Expected x2 to be %d, got %d", expected, core.x[2])
+	}
+}
+
+func TestSrli(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	core.x[1] = 32 // Set register x1 to 32
+
+	instr := iTypeInstruction{
+		rd:  2, // Destination register x2
+		rs1: 1, // Source register x1
+		imm: 4, // Shift amount 4
+	}
+
+	err := srli(core, instr)
+	if err != nil {
+		t.Fatalf("srli failed: %v", err)
+	}
+
+	expected := uint32(2) // 32 >> 4
+	if core.x[2] != expected {
+		t.Errorf("Expected x2 to be %d, got %d", expected, core.x[2])
+	}
+}
+
+func TestExecute_Srli(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	core.x[1] = 32
+
+	// SRLI x2, x1, 4 -> 0x0040D113
+	instruction := uint32(0x0040D113)
+
+	err := execute(core, instruction)
+	if err != nil {
+		t.Fatalf("execute failed: %v", err)
+	}
+
+	expected := uint32(2)
+	if core.x[2] != expected {
+		t.Errorf("Expected x2 to be %d, got %d", expected, core.x[2])
+	}
+}
+
 func TestExecute_UnsupportedInstruction(t *testing.T) {
 	core := NewCore(&devices.Bus{})
 
@@ -287,6 +365,106 @@ func TestBne(t *testing.T) {
 	expectedPC = uint32(0x3004) // PC should advance by 4
 	if core.pc != expectedPC {
 		t.Errorf("Expected PC to be %X, got %X", expectedPC, core.pc)
+	}
+}
+
+func TestBlt(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	core.pc = 0x3000
+
+	// Case 1: rs1 < rs2 (signed), branch taken
+	core.x[1] = 0xFFFFFFF6 // -10
+	core.x[2] = 0x00000005 // 5
+	instr := bTypeInstruction{
+		rs1: 1,
+		rs2: 2,
+		imm: 0x100,
+	}
+	err := blt(core, instr)
+	if err != nil {
+		t.Fatalf("blt failed: %v", err)
+	}
+	if core.pc != 0x3100 {
+		t.Errorf("Expected PC to be 0x3100, got %X", core.pc)
+	}
+
+	// Case 2: rs1 >= rs2 (signed), branch not taken
+	core.pc = 0x3000
+	core.x[1] = 0x00000005 // 5
+	core.x[2] = 0xFFFFFFF6 // -10
+	err = blt(core, instr)
+	if err != nil {
+		t.Fatalf("blt failed: %v", err)
+	}
+	if core.pc != 0x3004 {
+		t.Errorf("Expected PC to be 0x3004, got %X", core.pc)
+	}
+}
+
+func TestExecute_Blt(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	core.pc = 0x3000
+	core.x[1] = 0xFFFFFFF6 // -10
+	core.x[2] = 0x00000005 // 5
+
+	// BLT x1, x2, 0x100 -> 0x1020C063
+	instruction := uint32(0x1020C063)
+	err := execute(core, instruction)
+	if err != nil {
+		t.Fatalf("execute failed: %v", err)
+	}
+	if core.pc != 0x3100 {
+		t.Errorf("Expected PC to be 0x3100, got %X", core.pc)
+	}
+}
+
+func TestBltu(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	core.pc = 0x3000
+
+	// Case 1: rs1 < rs2 (unsigned), branch taken
+	core.x[1] = 0x00000005 // 5
+	core.x[2] = 0xFFFFFFF6 // large unsigned
+	instr := bTypeInstruction{
+		rs1: 1,
+		rs2: 2,
+		imm: 0x100,
+	}
+	err := bltu(core, instr)
+	if err != nil {
+		t.Fatalf("bltu failed: %v", err)
+	}
+	if core.pc != 0x3100 {
+		t.Errorf("Expected PC to be 0x3100, got %X", core.pc)
+	}
+
+	// Case 2: rs1 >= rs2 (unsigned), branch not taken
+	core.pc = 0x3000
+	core.x[1] = 0xFFFFFFF6 // large unsigned
+	core.x[2] = 0x00000005 // 5
+	err = bltu(core, instr)
+	if err != nil {
+		t.Fatalf("bltu failed: %v", err)
+	}
+	if core.pc != 0x3004 {
+		t.Errorf("Expected PC to be 0x3004, got %X", core.pc)
+	}
+}
+
+func TestExecute_Bltu(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	core.pc = 0x3000
+	core.x[1] = 0x00000005 // 5
+	core.x[2] = 0xFFFFFFF6 // large unsigned
+
+	// BLTU x1, x2, 0x100 -> 0x1020E063
+	instruction := uint32(0x1020E063)
+	err := execute(core, instruction)
+	if err != nil {
+		t.Fatalf("execute failed: %v", err)
+	}
+	if core.pc != 0x3100 {
+		t.Errorf("Expected PC to be 0x3100, got %X", core.pc)
 	}
 }
 
