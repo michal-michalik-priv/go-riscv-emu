@@ -9,24 +9,26 @@ import (
 
 // RV32I Instruction opcodes
 const (
-	opcodeAddi = 0b0010011
-	opcodeJalr = 0b1100111
-	opcodeLui  = 0b0110111
-	opcodeSb   = 0b0100011
-	opcodeJal  = 0b1101111
-	opcodeLb   = 0b0000011
-	opcodeLbu  = 0b0000011
-	opcodeBne  = 0b1100011
+	opcodeAddi   = 0b0010011
+	opcodeJalr   = 0b1100111
+	opcodeLui    = 0b0110111
+	opcodeSb     = 0b0100011
+	opcodeJal    = 0b1101111
+	opcodeLb     = 0b0000011
+	opcodeLbu    = 0b0000011
+	opcodeBne    = 0b1100011
+	opcodeSystem = 0b1110011
 )
 
 // RV32I Funct3 for all instructions
 const (
-	iTypeFunc3Addi = 0b000
-	iTypeFunc3Jalr = 0b000
-	sTypeFunc3Sb   = 0b000
-	iTypeFunc3Lb   = 0b000
-	iTypeFunc3Lbu  = 0b100
-	bTypeFunc3Bne  = 0b001
+	iTypeFunc3Addi  = 0b000
+	iTypeFunc3Jalr  = 0b000
+	sTypeFunc3Sb    = 0b000
+	iTypeFunc3Lb    = 0b000
+	iTypeFunc3Lbu   = 0b100
+	bTypeFunc3Bne   = 0b001
+	iTypeFunc3Csrrs = 0b010
 )
 
 // iTypeInstruction represents a parsed I-type instruction
@@ -234,6 +236,28 @@ func bne(core *Core, instr bTypeInstruction) error {
 	return nil
 }
 
+// csrrs executes the CSRRS instruction on the given core.
+func csrrs(core *Core, instr iTypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing CSRRS instruction: %+v\n", instr))
+	csrAddr := uint32(instr.imm) & 0xFFF // 12-bit CSR address
+
+	// Read current CSR value
+	oldValue := core.csrs[csrAddr]
+
+	// Write old value to destination register
+	if instr.rd != 0 {
+		core.x[instr.rd] = oldValue
+	}
+
+	// If rs1 is not x0, set bits in CSR
+	if instr.rs1 != 0 {
+		core.csrs[csrAddr] = oldValue | core.x[instr.rs1]
+	}
+
+	core.pc += 4
+	return nil
+}
+
 // Parse parses a 32-bit instruction word and returns the corresponding
 // instruction struct based on the opcode and funct3 fields.
 func execute(core *Core, instruction uint32) error {
@@ -257,6 +281,8 @@ func execute(core *Core, instruction uint32) error {
 		return lbu(core, parseIType(instruction))
 	case opcode == opcodeBne && func3 == bTypeFunc3Bne:
 		return bne(core, parseBType(instruction))
+	case opcode == opcodeSystem && func3 == iTypeFunc3Csrrs:
+		return csrrs(core, parseIType(instruction))
 
 	default:
 		return fmt.Errorf("unsupported instruction, %032b", instruction)

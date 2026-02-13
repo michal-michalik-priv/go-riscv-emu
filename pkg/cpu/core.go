@@ -9,17 +9,19 @@ import (
 
 // Core represents the CPU core with its registers and program counter.
 type Core struct {
-	pc  uint32
-	x   [32]uint32
-	bus *devices.Bus
+	pc   uint32
+	x    [32]uint32
+	csrs [4096]uint32
+	bus  *devices.Bus
 }
 
 // NewCore creates and initializes a new CPU core with the given bus.
 func NewCore(bus *devices.Bus) *Core {
 	return &Core{
-		pc:  0,
-		bus: bus,
-		x:   [32]uint32{},
+		pc:   0,
+		bus:  bus,
+		x:    [32]uint32{},
+		csrs: [4096]uint32{},
 	}
 }
 
