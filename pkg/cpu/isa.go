@@ -193,6 +193,7 @@ func jal(core *Core, instr jTypeInstruction) error {
 	return nil
 }
 
+// lb executes the LB instruction on the given core.
 func lb(core *Core, instr iTypeInstruction) error {
 	slog.Debug(fmt.Sprintf("Executing LB instruction: %+v\n", instr))
 	address := core.x[instr.rs1] + uint32(instr.imm)
@@ -207,6 +208,7 @@ func lb(core *Core, instr iTypeInstruction) error {
 	return nil
 }
 
+// lbu executes the LBU instruction on the given core.
 func lbu(core *Core, instr iTypeInstruction) error {
 	slog.Debug(fmt.Sprintf("Executing LBU instruction: %+v\n", instr))
 	address := core.x[instr.rs1] + uint32(instr.imm)
@@ -221,6 +223,7 @@ func lbu(core *Core, instr iTypeInstruction) error {
 	return nil
 }
 
+// bne executes the BNE instruction on the given core.
 func bne(core *Core, instr bTypeInstruction) error {
 	slog.Debug(fmt.Sprintf("Executing BNE instruction: %+v\n", instr))
 	if core.x[instr.rs1] != core.x[instr.rs2] {
