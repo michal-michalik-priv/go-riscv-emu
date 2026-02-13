@@ -9,17 +9,18 @@ import (
 
 // RV32I Instruction opcodes
 const (
-	opcodeAddi   = 0b0010011
-	opcodeJalr   = 0b1100111
-	opcodeLui    = 0b0110111
-	opcodeAuipc  = 0b0010111
-	opcodeSb     = 0b0100011
-	opcodeJal    = 0b1101111
-	opcodeLb     = 0b0000011
-	opcodeLbu    = 0b0000011
-	opcodeBne    = 0b1100011
-	opcodeOp     = 0b0110011
-	opcodeSystem = 0b1110011
+	opcodeAddi    = 0b0010011
+	opcodeJalr    = 0b1100111
+	opcodeLui     = 0b0110111
+	opcodeAuipc   = 0b0010111
+	opcodeSb      = 0b0100011
+	opcodeJal     = 0b1101111
+	opcodeLb      = 0b0000011
+	opcodeLbu     = 0b0000011
+	opcodeBne     = 0b1100011
+	opcodeOp      = 0b0110011
+	opcodeMiscMem = 0b0001111
+	opcodeSystem  = 0b1110011
 )
 
 // RV32I Funct3 for all instructions
@@ -36,6 +37,7 @@ const (
 	bTypeFunc3Blt      = 0b100
 	bTypeFunc3Bltu     = 0b110
 	rTypeFunc3Add      = 0b000
+	iTypeFunc3Fence    = 0b000
 	iTypeFunc3Csrrw    = 0b001
 	iTypeFunc3Csrrs    = 0b010
 	iTypeFunc3Csrrwi   = 0b101
@@ -206,6 +208,15 @@ func add(core *Core, instr rTypeInstruction) error {
 	slog.Debug(fmt.Sprintf("Executing ADD instruction: %+v\n", instr))
 	val := core.GetRegister(int(instr.rs1)) + core.GetRegister(int(instr.rs2))
 	core.SetRegister(int(instr.rd), val)
+	core.pc += 4
+	return nil
+}
+
+// fence executes the FENCE instruction on the given core.
+func fence(core *Core, instr iTypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing FENCE instruction: %+v\n", instr))
+	// TODO: In case multicore support would be added, we need to be
+	// more smart than simply advancing the PC...
 	core.pc += 4
 	return nil
 }
@@ -479,6 +490,8 @@ func execute(core *Core, instruction uint32) error {
 			return add(core, instr)
 		}
 		return fmt.Errorf("unsupported R-type instruction, %032b", instruction)
+	case opcode == opcodeMiscMem && func3 == iTypeFunc3Fence:
+		return fence(core, parseIType(instruction))
 	case opcode == opcodeSystem && func3 == 0:
 		instr := parseIType(instruction)
 		switch instr.imm {
