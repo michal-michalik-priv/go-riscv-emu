@@ -30,6 +30,7 @@ const (
 	sTypeFunc3Sb       = 0b000
 	iTypeFunc3Lb       = 0b000
 	iTypeFunc3Lbu      = 0b100
+	bTypeFunc3Beq      = 0b000
 	bTypeFunc3Bne      = 0b001
 	bTypeFunc3Blt      = 0b100
 	bTypeFunc3Bltu     = 0b110
@@ -241,6 +242,17 @@ func lbu(core *Core, instr iTypeInstruction) error {
 	return nil
 }
 
+// beq executes the BEQ instruction on the given core.
+func beq(core *Core, instr bTypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing BEQ instruction: %+v\n", instr))
+	if core.GetRegister(int(instr.rs1)) == core.GetRegister(int(instr.rs2)) {
+		core.pc = core.pc + uint32(instr.imm)
+	} else {
+		core.pc += 4
+	}
+	return nil
+}
+
 // bne executes the BNE instruction on the given core.
 func bne(core *Core, instr bTypeInstruction) error {
 	slog.Debug(fmt.Sprintf("Executing BNE instruction: %+v\n", instr))
@@ -385,6 +397,8 @@ func execute(core *Core, instruction uint32) error {
 		return lb(core, parseIType(instruction))
 	case opcode == opcodeLbu && func3 == iTypeFunc3Lbu:
 		return lbu(core, parseIType(instruction))
+	case opcode == opcodeBne && func3 == bTypeFunc3Beq:
+		return beq(core, parseBType(instruction))
 	case opcode == opcodeBne && func3 == bTypeFunc3Bne:
 		return bne(core, parseBType(instruction))
 	case opcode == opcodeBne && func3 == bTypeFunc3Blt:

@@ -331,6 +331,55 @@ func TestLbu(t *testing.T) {
 	}
 }
 
+func TestBeq(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	core.pc = 0x3000
+
+	// Case 1: rs1 == rs2, branch taken
+	core.x[1] = 10
+	core.x[2] = 10
+	instr := bTypeInstruction{
+		rs1: 1,
+		rs2: 2,
+		imm: 0x100,
+	}
+	err := beq(core, instr)
+	if err != nil {
+		t.Fatalf("beq failed: %v", err)
+	}
+	if core.pc != 0x3100 {
+		t.Errorf("Expected PC to be 0x3100, got %X", core.pc)
+	}
+
+	// Case 2: rs1 != rs2, branch not taken
+	core.pc = 0x3000
+	core.x[2] = 20
+	err = beq(core, instr)
+	if err != nil {
+		t.Fatalf("beq failed: %v", err)
+	}
+	if core.pc != 0x3004 {
+		t.Errorf("Expected PC to be 0x3004, got %X", core.pc)
+	}
+}
+
+func TestExecute_Beq(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	core.pc = 0x3000
+	core.x[1] = 10
+	core.x[2] = 10
+
+	// BEQ x1, x2, 0x100 -> 0x10208063
+	instruction := uint32(0x10208063)
+	err := execute(core, instruction)
+	if err != nil {
+		t.Fatalf("execute failed: %v", err)
+	}
+	if core.pc != 0x3100 {
+		t.Errorf("Expected PC to be 0x3100, got %X", core.pc)
+	}
+}
+
 func TestBne(t *testing.T) {
 	core := NewCore(&devices.Bus{})
 	core.pc = 0x3000 // Set initial program counter
@@ -365,6 +414,26 @@ func TestBne(t *testing.T) {
 	expectedPC = uint32(0x3004) // PC should advance by 4
 	if core.pc != expectedPC {
 		t.Errorf("Expected PC to be %X, got %X", expectedPC, core.pc)
+	}
+}
+
+func TestExecute_Bne(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	core.pc = 0x3000
+	core.x[1] = 10
+	core.x[2] = 20
+
+	// BNE x1, x2, 0x100
+	// Opcode: 1100011 (0x63)
+	// rs1: 1, rs2: 2, funct3: 001, imm: 0x100
+	// 0x10209063
+	instruction := uint32(0x10209063)
+	err := execute(core, instruction)
+	if err != nil {
+		t.Fatalf("execute failed: %v", err)
+	}
+	if core.pc != 0x3100 {
+		t.Errorf("Expected PC to be 0x3100, got %X", core.pc)
 	}
 }
 
