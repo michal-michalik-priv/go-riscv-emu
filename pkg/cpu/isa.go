@@ -12,6 +12,7 @@ const (
 	opcodeAddi   = 0b0010011
 	opcodeJalr   = 0b1100111
 	opcodeLui    = 0b0110111
+	opcodeAuipc  = 0b0010111
 	opcodeSb     = 0b0100011
 	opcodeJal    = 0b1101111
 	opcodeLb     = 0b0000011
@@ -22,13 +23,15 @@ const (
 
 // RV32I Funct3 for all instructions
 const (
-	iTypeFunc3Addi  = 0b000
-	iTypeFunc3Jalr  = 0b000
-	sTypeFunc3Sb    = 0b000
-	iTypeFunc3Lb    = 0b000
-	iTypeFunc3Lbu   = 0b100
-	bTypeFunc3Bne   = 0b001
-	iTypeFunc3Csrrs = 0b010
+	iTypeFunc3Addi   = 0b000
+	iTypeFunc3Jalr   = 0b000
+	sTypeFunc3Sb     = 0b000
+	iTypeFunc3Lb     = 0b000
+	iTypeFunc3Lbu    = 0b100
+	bTypeFunc3Bne    = 0b001
+	iTypeFunc3Csrrw  = 0b001
+	iTypeFunc3Csrrs  = 0b010
+	iTypeFunc3Csrrwi = 0b101
 )
 
 // iTypeInstruction represents a parsed I-type instruction
@@ -174,6 +177,14 @@ func lui(core *Core, instr uTypeInstruction) error {
 	return nil
 }
 
+// auipc executes the AUIPC instruction on the given core.
+func auipc(core *Core, instr uTypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing AUIPC instruction: %+v\n", instr))
+	core.SetRegister(int(instr.rd), core.pc+(uint32(instr.imm)<<12))
+	core.pc += 4
+	return nil
+}
+
 // sb executes the SB instruction on the given core.
 func sb(core *Core, instr sTypeInstruction) error {
 	slog.Debug(fmt.Sprintf("Executing SB instruction: %+v\n", instr))
@@ -237,6 +248,43 @@ func bne(core *Core, instr bTypeInstruction) error {
 	return nil
 }
 
+// csrrw executes the CSRRW instruction on the given core.
+func csrrw(core *Core, instr iTypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing CSRRW instruction: %+v\n", instr))
+	csrAddr := uint32(instr.imm) & 0xFFF // 12-bit CSR address
+
+	// If rd is not x0, read current CSR value and write it to rd
+	if instr.rd != 0 {
+		oldValue := core.csrs[csrAddr]
+		core.SetRegister(int(instr.rd), oldValue)
+	}
+
+	// Write value from rs1 to CSR
+	core.csrs[csrAddr] = core.GetRegister(int(instr.rs1))
+
+	core.pc += 4
+	return nil
+}
+
+// csrrwi executes the CSRRWI instruction on the given core.
+func csrrwi(core *Core, instr iTypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing CSRRWI instruction: %+v\n", instr))
+	csrAddr := uint32(instr.imm) & 0xFFF // 12-bit CSR address
+	uimm := uint32(instr.rs1)
+
+	// If rd is not x0, read current CSR value and write it to rd
+	if instr.rd != 0 {
+		oldValue := core.csrs[csrAddr]
+		core.SetRegister(int(instr.rd), oldValue)
+	}
+
+	// Write zero-extended 5-bit immediate to CSR
+	core.csrs[csrAddr] = uimm
+
+	core.pc += 4
+	return nil
+}
+
 // csrrs executes the CSRRS instruction on the given core.
 func csrrs(core *Core, instr iTypeInstruction) error {
 	slog.Debug(fmt.Sprintf("Executing CSRRS instruction: %+v\n", instr))
@@ -272,6 +320,8 @@ func execute(core *Core, instruction uint32) error {
 		return jarl(core, parseIType(instruction))
 	case opcode == opcodeLui: // TODO: We might check that before slicing func3
 		return lui(core, parseUType(instruction))
+	case opcode == opcodeAuipc:
+		return auipc(core, parseUType(instruction))
 	case opcode == opcodeJal:
 		return jal(core, parseJType(instruction))
 	case opcode == opcodeSb && func3 == sTypeFunc3Sb:
@@ -282,6 +332,10 @@ func execute(core *Core, instruction uint32) error {
 		return lbu(core, parseIType(instruction))
 	case opcode == opcodeBne && func3 == bTypeFunc3Bne:
 		return bne(core, parseBType(instruction))
+	case opcode == opcodeSystem && func3 == iTypeFunc3Csrrw:
+		return csrrw(core, parseIType(instruction))
+	case opcode == opcodeSystem && func3 == iTypeFunc3Csrrwi:
+		return csrrwi(core, parseIType(instruction))
 	case opcode == opcodeSystem && func3 == iTypeFunc3Csrrs:
 		return csrrs(core, parseIType(instruction))
 
