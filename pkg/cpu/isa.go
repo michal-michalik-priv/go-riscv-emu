@@ -39,6 +39,20 @@ const (
 	iTypeFunc3Csrrwi   = 0b101
 )
 
+// RV32I Privileged instruction immediate selectors
+const (
+	privImmSret = 0x102
+	privImmMret = 0x302
+)
+
+// RISC-V CSR addresses
+const (
+	csrSepc    = 0x141
+	csrMstatus = 0x300
+	csrMepc    = 0x341
+	csrMcause  = 0x342
+)
+
 // iTypeInstruction represents a parsed I-type instruction
 type iTypeInstruction struct {
 	rd  uint32 // Destination register
@@ -343,6 +357,20 @@ func csrrwi(core *Core, instr iTypeInstruction) error {
 	return nil
 }
 
+// mret executes the MRET instruction on the given core.
+func mret(core *Core) error {
+	slog.Debug("Executing MRET instruction")
+	core.pc = core.csrs[csrMepc]
+	return nil
+}
+
+// sret executes the SRET instruction on the given core.
+func sret(core *Core) error {
+	slog.Debug("Executing SRET instruction")
+	core.pc = core.csrs[csrSepc]
+	return nil
+}
+
 // csrrs executes the CSRRS instruction on the given core.
 func csrrs(core *Core, instr iTypeInstruction) error {
 	slog.Debug(fmt.Sprintf("Executing CSRRS instruction: %+v\n", instr))
@@ -405,6 +433,16 @@ func execute(core *Core, instruction uint32) error {
 		return blt(core, parseBType(instruction))
 	case opcode == opcodeBne && func3 == bTypeFunc3Bltu:
 		return bltu(core, parseBType(instruction))
+	case opcode == opcodeSystem && func3 == 0:
+		instr := parseIType(instruction)
+		switch instr.imm {
+		case privImmMret:
+			return mret(core)
+		case privImmSret:
+			return sret(core)
+		default:
+			return fmt.Errorf("unsupported system instruction, %032b", instruction)
+		}
 	case opcode == opcodeSystem && func3 == iTypeFunc3Csrrw:
 		return csrrw(core, parseIType(instruction))
 	case opcode == opcodeSystem && func3 == iTypeFunc3Csrrwi:

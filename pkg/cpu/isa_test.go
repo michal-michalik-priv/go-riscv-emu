@@ -417,6 +417,66 @@ func TestBne(t *testing.T) {
 	}
 }
 
+func TestMret(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	core.csrs[csrMepc] = 0x4000 // mepc
+
+	err := mret(core)
+	if err != nil {
+		t.Fatalf("mret failed: %v", err)
+	}
+
+	if core.pc != 0x4000 {
+		t.Errorf("Expected PC to be 0x4000, got %X", core.pc)
+	}
+}
+
+func TestExecute_Mret(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	core.csrs[csrMepc] = 0x5000 // mepc
+
+	// MRET -> 0x30200073
+	instruction := uint32(0x30200073)
+	err := execute(core, instruction)
+	if err != nil {
+		t.Fatalf("execute failed: %v", err)
+	}
+
+	if core.pc != 0x5000 {
+		t.Errorf("Expected PC to be 0x5000, got %X", core.pc)
+	}
+}
+
+func TestSret(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	core.csrs[csrSepc] = 0x6000 // sepc
+
+	err := sret(core)
+	if err != nil {
+		t.Fatalf("sret failed: %v", err)
+	}
+
+	if core.pc != 0x6000 {
+		t.Errorf("Expected PC to be 0x6000, got %X", core.pc)
+	}
+}
+
+func TestExecute_Sret(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	core.csrs[csrSepc] = 0x7000 // sepc
+
+	// SRET -> 0x10200073
+	instruction := uint32(0x10200073)
+	err := execute(core, instruction)
+	if err != nil {
+		t.Fatalf("execute failed: %v", err)
+	}
+
+	if core.pc != 0x7000 {
+		t.Errorf("Expected PC to be 0x7000, got %X", core.pc)
+	}
+}
+
 func TestExecute_Bne(t *testing.T) {
 	core := NewCore(&devices.Bus{})
 	core.pc = 0x3000
@@ -539,7 +599,7 @@ func TestExecute_Bltu(t *testing.T) {
 
 func TestCsrrw(t *testing.T) {
 	core := NewCore(&devices.Bus{})
-	csrAddr := uint32(0x300) // mstatus
+	csrAddr := uint32(csrMstatus)
 	core.csrs[csrAddr] = 0x1
 	core.x[1] = 0x8 // new value
 
@@ -558,13 +618,13 @@ func TestCsrrw(t *testing.T) {
 		t.Errorf("Expected x2 to be 0x1, got %X", core.x[2])
 	}
 	if core.csrs[csrAddr] != 0x8 {
-		t.Errorf("Expected CSR 0x300 to be 0x8, got %X", core.csrs[csrAddr])
+		t.Errorf("Expected CSR %X to be 0x8, got %X", csrAddr, core.csrs[csrAddr])
 	}
 }
 
 func TestCsrrw_RdZero(t *testing.T) {
 	core := NewCore(&devices.Bus{})
-	csrAddr := uint32(0x300) // mstatus
+	csrAddr := uint32(csrMstatus)
 	core.csrs[csrAddr] = 0x1
 	core.x[1] = 0x8 // new value
 
@@ -580,13 +640,13 @@ func TestCsrrw_RdZero(t *testing.T) {
 	}
 
 	if core.csrs[csrAddr] != 0x8 {
-		t.Errorf("Expected CSR 0x300 to be 0x8, got %X", core.csrs[csrAddr])
+		t.Errorf("Expected CSR %X to be 0x8, got %X", csrAddr, core.csrs[csrAddr])
 	}
 }
 
 func TestExecute_Csrrw(t *testing.T) {
 	core := NewCore(&devices.Bus{})
-	csrAddr := uint32(0x342) // mcause
+	csrAddr := uint32(csrMcause)
 	core.csrs[csrAddr] = 0x5
 	core.x[10] = 0x9
 
@@ -614,7 +674,7 @@ func TestExecute_Csrrw(t *testing.T) {
 
 func TestCsrrwi(t *testing.T) {
 	core := NewCore(&devices.Bus{})
-	csrAddr := uint32(0x300) // mstatus
+	csrAddr := uint32(csrMstatus)
 	core.csrs[csrAddr] = 0x1
 
 	instr := iTypeInstruction{
@@ -638,7 +698,7 @@ func TestCsrrwi(t *testing.T) {
 
 func TestExecute_Csrrwi(t *testing.T) {
 	core := NewCore(&devices.Bus{})
-	csrAddr := uint32(0x342) // mcause
+	csrAddr := uint32(csrMcause)
 	core.csrs[csrAddr] = 0x5
 
 	// CSRRWI x11, mcause, 0x1A
@@ -665,7 +725,7 @@ func TestExecute_Csrrwi(t *testing.T) {
 
 func TestCsrrs(t *testing.T) {
 	core := NewCore(&devices.Bus{})
-	csrAddr := uint32(0x300) // mstatus
+	csrAddr := uint32(csrMstatus)
 	core.csrs[csrAddr] = 0x1
 	core.x[1] = 0x8 // bit to set
 
@@ -690,7 +750,7 @@ func TestCsrrs(t *testing.T) {
 
 func TestCsrrs_ReadOnce(t *testing.T) {
 	core := NewCore(&devices.Bus{})
-	csrAddr := uint32(0x300) // mstatus
+	csrAddr := uint32(csrMstatus)
 	core.csrs[csrAddr] = 0x1
 
 	instr := iTypeInstruction{
@@ -714,7 +774,7 @@ func TestCsrrs_ReadOnce(t *testing.T) {
 
 func TestExecute_Csrrs(t *testing.T) {
 	core := NewCore(&devices.Bus{})
-	csrAddr := uint32(0x342) // mcause
+	csrAddr := uint32(csrMcause)
 	core.csrs[csrAddr] = 0x5
 	core.x[10] = 0x2
 
