@@ -1618,3 +1618,127 @@ func TestParseRType(t *testing.T) {
 		t.Errorf("Expected func7 to be 0, got %d", parsed.func7)
 	}
 }
+
+func TestBge(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	core.pc = 0x3000
+
+	// Case 1: rs1 > rs2 (signed), branch taken
+	core.x[1] = 0x00000005 // 5
+	core.x[2] = 0xFFFFFFF6 // -10
+	instr := bTypeInstruction{
+		rs1: 1,
+		rs2: 2,
+		imm: 0x100,
+	}
+	err := bge(core, instr)
+	if err != nil {
+		t.Fatalf("bge failed: %v", err)
+	}
+	if core.pc != 0x3100 {
+		t.Errorf("Expected PC to be 0x3100, got %X", core.pc)
+	}
+
+	// Case 2: rs1 == rs2 (signed), branch taken
+	core.pc = 0x3000
+	core.x[1] = 10
+	core.x[2] = 10
+	err = bge(core, instr)
+	if err != nil {
+		t.Fatalf("bge failed: %v", err)
+	}
+	if core.pc != 0x3100 {
+		t.Errorf("Expected PC to be 0x3100, got %X", core.pc)
+	}
+
+	// Case 3: rs1 < rs2 (signed), branch not taken
+	core.pc = 0x3000
+	core.x[1] = 0xFFFFFFF6 // -10
+	core.x[2] = 0x00000005 // 5
+	err = bge(core, instr)
+	if err != nil {
+		t.Fatalf("bge failed: %v", err)
+	}
+	if core.pc != 0x3004 {
+		t.Errorf("Expected PC to be 0x3004, got %X", core.pc)
+	}
+}
+
+func TestExecute_Bge(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	core.pc = 0x3000
+	core.x[1] = 0x00000005 // 5
+	core.x[2] = 0xFFFFFFF6 // -10
+
+	// BGE x1, x2, 0x100 -> 0x1020D063
+	instruction := uint32(0x1020D063)
+	err := execute(core, instruction)
+	if err != nil {
+		t.Fatalf("execute failed: %v", err)
+	}
+	if core.pc != 0x3100 {
+		t.Errorf("Expected PC to be 0x3100, got %X", core.pc)
+	}
+}
+
+func TestBgeu(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	core.pc = 0x3000
+
+	// Case 1: rs1 > rs2 (unsigned), branch taken
+	core.x[1] = 0xFFFFFFF6 // large unsigned
+	core.x[2] = 0x00000005 // 5
+	instr := bTypeInstruction{
+		rs1: 1,
+		rs2: 2,
+		imm: 0x100,
+	}
+	err := bgeu(core, instr)
+	if err != nil {
+		t.Fatalf("bgeu failed: %v", err)
+	}
+	if core.pc != 0x3100 {
+		t.Errorf("Expected PC to be 0x3100, got %X", core.pc)
+	}
+
+	// Case 2: rs1 == rs2 (unsigned), branch taken
+	core.pc = 0x3000
+	core.x[1] = 10
+	core.x[2] = 10
+	err = bgeu(core, instr)
+	if err != nil {
+		t.Fatalf("bgeu failed: %v", err)
+	}
+	if core.pc != 0x3100 {
+		t.Errorf("Expected PC to be 0x3100, got %X", core.pc)
+	}
+
+	// Case 3: rs1 < rs2 (unsigned), branch not taken
+	core.pc = 0x3000
+	core.x[1] = 0x00000005 // 5
+	core.x[2] = 0xFFFFFFF6 // large unsigned
+	err = bgeu(core, instr)
+	if err != nil {
+		t.Fatalf("bgeu failed: %v", err)
+	}
+	if core.pc != 0x3004 {
+		t.Errorf("Expected PC to be 0x3004, got %X", core.pc)
+	}
+}
+
+func TestExecute_Bgeu(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	core.pc = 0x3000
+	core.x[1] = 0xFFFFFFF6 // large unsigned
+	core.x[2] = 0x00000005 // 5
+
+	// BGEU x1, x2, 0x100 -> 0x1020F063
+	instruction := uint32(0x1020F063)
+	err := execute(core, instruction)
+	if err != nil {
+		t.Fatalf("execute failed: %v", err)
+	}
+	if core.pc != 0x3100 {
+		t.Errorf("Expected PC to be 0x3100, got %X", core.pc)
+	}
+}

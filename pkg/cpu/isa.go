@@ -43,7 +43,9 @@ const (
 	bTypeFunc3Beq      = 0b000
 	bTypeFunc3Bne      = 0b001
 	bTypeFunc3Blt      = 0b100
+	bTypeFunc3Bge      = 0b101
 	bTypeFunc3Bltu     = 0b110
+	bTypeFunc3Bgeu     = 0b111
 	rTypeFunc3Add      = 0b000
 	rTypeFunc3Slt      = 0b010
 	rTypeFunc3Sltu     = 0b011
@@ -524,6 +526,28 @@ func bltu(core *Core, instr bTypeInstruction) error {
 	return nil
 }
 
+// bge executes the BGE instruction on the given core.
+func bge(core *Core, instr bTypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing BGE instruction: %+v\n", instr))
+	if int32(core.GetRegister(int(instr.rs1))) >= int32(core.GetRegister(int(instr.rs2))) {
+		core.pc = core.pc + uint32(instr.imm)
+	} else {
+		core.pc += 4
+	}
+	return nil
+}
+
+// bgeu executes the BGEU instruction on the given core.
+func bgeu(core *Core, instr bTypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing BGEU instruction: %+v\n", instr))
+	if core.GetRegister(int(instr.rs1)) >= core.GetRegister(int(instr.rs2)) {
+		core.pc = core.pc + uint32(instr.imm)
+	} else {
+		core.pc += 4
+	}
+	return nil
+}
+
 // slli executes the SLLI instruction on the given core.
 func slli(core *Core, instr iTypeInstruction) error {
 	slog.Debug(fmt.Sprintf("Executing SLLI instruction: %+v\n", instr))
@@ -691,8 +715,12 @@ func execute(core *Core, instruction uint32) error {
 		return bne(core, parseBType(instruction))
 	case opcode == opcodeBne && func3 == bTypeFunc3Blt:
 		return blt(core, parseBType(instruction))
+	case opcode == opcodeBne && func3 == bTypeFunc3Bge:
+		return bge(core, parseBType(instruction))
 	case opcode == opcodeBne && func3 == bTypeFunc3Bltu:
 		return bltu(core, parseBType(instruction))
+	case opcode == opcodeBne && func3 == bTypeFunc3Bgeu:
+		return bgeu(core, parseBType(instruction))
 	case opcode == opcodeOp && func3 == rTypeFunc3Add:
 		instr := parseRType(instruction)
 		if instr.func7 == rTypeFunc7Add {
