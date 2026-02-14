@@ -50,6 +50,7 @@ const (
 	rTypeFunc3Slt      = 0b010
 	rTypeFunc3Sltu     = 0b011
 	rTypeFunc3Xor      = 0b100
+	rTypeFunc3SrlSra   = 0b101
 	rTypeFunc3Or       = 0b110
 	rTypeFunc3And      = 0b111
 	iTypeFunc3Fence    = 0b000
@@ -72,6 +73,8 @@ const (
 	rTypeFunc7Slt  = 0b0000000
 	rTypeFunc7Sltu = 0b0000000
 	rTypeFunc7Xor  = 0b0000000
+	rTypeFunc7Srl  = 0b0000000
+	rTypeFunc7Sra  = 0b0100000
 	rTypeFunc7Or   = 0b0000000
 	rTypeFunc7And  = 0b0000000
 )
@@ -568,6 +571,36 @@ func srli(core *Core, instr iTypeInstruction) error {
 	return nil
 }
 
+// srai executes the SRAI instruction on the given core.
+func srai(core *Core, instr iTypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing SRAI instruction: %+v\n", instr))
+	shamt := uint32(instr.imm) & 0x1F
+	val := int32(core.GetRegister(int(instr.rs1))) >> shamt
+	core.SetRegister(int(instr.rd), uint32(val))
+	core.pc += 4
+	return nil
+}
+
+// srl executes the SRL instruction on the given core.
+func srl(core *Core, instr rTypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing SRL instruction: %+v\n", instr))
+	shamt := core.GetRegister(int(instr.rs2)) & 0x1F
+	val := core.GetRegister(int(instr.rs1)) >> shamt
+	core.SetRegister(int(instr.rd), val)
+	core.pc += 4
+	return nil
+}
+
+// sra executes the SRA instruction on the given core.
+func sra(core *Core, instr rTypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing SRA instruction: %+v\n", instr))
+	shamt := core.GetRegister(int(instr.rs2)) & 0x1F
+	val := int32(core.GetRegister(int(instr.rs1))) >> shamt
+	core.SetRegister(int(instr.rd), uint32(val))
+	core.pc += 4
+	return nil
+}
+
 // csrrw executes the CSRRW instruction on the given core.
 func csrrw(core *Core, instr iTypeInstruction) error {
 	slog.Debug(fmt.Sprintf("Executing CSRRW instruction: %+v\n", instr))
@@ -689,6 +722,8 @@ func execute(core *Core, instruction uint32) error {
 		// Check imm[11:5] to distinguish between SRLI and SRAI
 		if (instr.imm >> 5) == 0 {
 			return srli(core, instr)
+		} else if (instr.imm >> 5) == 0b0100000 {
+			return srai(core, instr)
 		}
 		return fmt.Errorf("unsupported instruction, %032b", instruction)
 	case opcode == opcodeJalr && func3 == iTypeFunc3Jalr:
@@ -757,6 +792,14 @@ func execute(core *Core, instruction uint32) error {
 		instr := parseRType(instruction)
 		if instr.func7 == rTypeFunc7And {
 			return and(core, instr)
+		}
+		return fmt.Errorf("unsupported R-type instruction, %032b", instruction)
+	case opcode == opcodeOp && func3 == rTypeFunc3SrlSra:
+		instr := parseRType(instruction)
+		if instr.func7 == rTypeFunc7Srl {
+			return srl(core, instr)
+		} else if instr.func7 == rTypeFunc7Sra {
+			return sra(core, instr)
 		}
 		return fmt.Errorf("unsupported R-type instruction, %032b", instruction)
 	case opcode == opcodeMiscMem && func3 == iTypeFunc3Fence:

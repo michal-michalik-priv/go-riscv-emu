@@ -1072,6 +1072,127 @@ func TestExecute_Beq(t *testing.T) {
 	}
 }
 
+func TestSrai(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	core.x[1] = 0x80000000 // Set register x1 to -2147483648
+
+	instr := iTypeInstruction{
+		rd:  2,
+		rs1: 1,
+		imm: 1 | (0x20 << 5), // Shift amount 1, SRAI funct7-like immediate bits
+	}
+
+	err := srai(core, instr)
+	if err != nil {
+		t.Fatalf("srai failed: %v", err)
+	}
+
+	expected := uint32(0xC0000000) // 0x80000000 >> 1 (arithmetic)
+	if core.x[2] != expected {
+		t.Errorf("Expected x2 to be %X, got %X", expected, core.x[2])
+	}
+}
+
+func TestExecute_Srai(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	core.x[1] = 0x80000000
+
+	// SRAI x2, x1, 1 -> 0x4010D113
+	instruction := uint32(0x4010D113)
+
+	err := execute(core, instruction)
+	if err != nil {
+		t.Fatalf("execute failed: %v", err)
+	}
+
+	expected := uint32(0xC0000000)
+	if core.x[2] != expected {
+		t.Errorf("Expected x2 to be %X, got %X", expected, core.x[2])
+	}
+}
+
+func TestSrl(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	core.x[1] = 0x80000000
+	core.x[2] = 1
+
+	instr := rTypeInstruction{
+		rd:  3,
+		rs1: 1,
+		rs2: 2,
+	}
+
+	err := srl(core, instr)
+	if err != nil {
+		t.Fatalf("srl failed: %v", err)
+	}
+
+	expected := uint32(0x40000000)
+	if core.x[3] != expected {
+		t.Errorf("Expected x3 to be %X, got %X", expected, core.x[3])
+	}
+}
+
+func TestExecute_Srl(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	core.x[1] = 0x80000000
+	core.x[2] = 1
+
+	// SRL x3, x1, x2 -> 0x0020D1B3
+	instruction := uint32(0x0020D1B3)
+
+	err := execute(core, instruction)
+	if err != nil {
+		t.Fatalf("execute failed: %v", err)
+	}
+
+	expected := uint32(0x40000000)
+	if core.x[3] != expected {
+		t.Errorf("Expected x3 to be %X, got %X", expected, core.x[3])
+	}
+}
+
+func TestSra(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	core.x[1] = 0x80000000
+	core.x[2] = 1
+
+	instr := rTypeInstruction{
+		rd:  3,
+		rs1: 1,
+		rs2: 2,
+	}
+
+	err := sra(core, instr)
+	if err != nil {
+		t.Fatalf("sra failed: %v", err)
+	}
+
+	expected := uint32(0xC0000000)
+	if core.x[3] != expected {
+		t.Errorf("Expected x3 to be %X, got %X", expected, core.x[3])
+	}
+}
+
+func TestExecute_Sra(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	core.x[1] = 0x80000000
+	core.x[2] = 1
+
+	// SRA x3, x1, x2 -> 0x4020D1B3
+	instruction := uint32(0x4020D1B3)
+
+	err := execute(core, instruction)
+	if err != nil {
+		t.Fatalf("execute failed: %v", err)
+	}
+
+	expected := uint32(0xC0000000)
+	if core.x[3] != expected {
+		t.Errorf("Expected x3 to be %X, got %X", expected, core.x[3])
+	}
+}
+
 func TestBne(t *testing.T) {
 	core := NewCore(&devices.Bus{})
 	core.pc = 0x3000 // Set initial program counter
