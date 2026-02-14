@@ -33,10 +33,13 @@ const (
 	iTypeFunc3SrliSrai = 0b101
 	iTypeFunc3Jalr     = 0b000
 	sTypeFunc3Sb       = 0b000
+	sTypeFunc3Sh       = 0b001
 	sTypeFunc3Sw       = 0b010
 	iTypeFunc3Lb       = 0b000
+	iTypeFunc3Lh       = 0b001
 	iTypeFunc3Lw       = 0b010
 	iTypeFunc3Lbu      = 0b100
+	iTypeFunc3Lhu      = 0b101
 	iTypeFunc3Xori     = 0b100
 	iTypeFunc3Ori      = 0b110
 	iTypeFunc3Andi     = 0b111
@@ -411,6 +414,23 @@ func sb(core *Core, instr sTypeInstruction) error {
 	return nil
 }
 
+// sh executes the SH instruction on the given core.
+func sh(core *Core, instr sTypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing SH instruction: %+v\n", instr))
+	address := core.GetRegister(int(instr.rs1)) + uint32(instr.imm)
+	value := core.GetRegister(int(instr.rs2))
+
+	for i := uint32(0); i < 2; i++ {
+		err := core.bus.Write(address+i, byte((value>>(i*8))&0xFF))
+		if err != nil {
+			return fmt.Errorf("SH failed at offset %d: %v", i, err)
+		}
+	}
+
+	core.pc += 4
+	return nil
+}
+
 // sw executes the SW instruction on the given core.
 func sw(core *Core, instr sTypeInstruction) error {
 	slog.Debug(fmt.Sprintf("Executing SW instruction: %+v\n", instr))
@@ -451,6 +471,26 @@ func lb(core *Core, instr iTypeInstruction) error {
 	return nil
 }
 
+// lh executes the LH instruction on the given core.
+func lh(core *Core, instr iTypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing LH instruction: %+v\n", instr))
+	address := core.GetRegister(int(instr.rs1)) + uint32(instr.imm)
+
+	var value uint32
+	for i := uint32(0); i < 2; i++ {
+		b, err := core.bus.Read(address + i)
+		if err != nil {
+			return fmt.Errorf("LH failed at offset %d: %v", i, err)
+		}
+		value |= uint32(b) << (i * 8)
+	}
+
+	core.SetRegister(int(instr.rd), uint32(utils.SignExtend(value, 16)))
+	core.pc += 4
+	return nil
+}
+
+// lbu executes the LBU instruction on the given core.
 // lbu executes the LBU instruction on the given core.
 func lbu(core *Core, instr iTypeInstruction) error {
 	slog.Debug(fmt.Sprintf("Executing LBU instruction: %+v\n", instr))
@@ -462,6 +502,25 @@ func lbu(core *Core, instr iTypeInstruction) error {
 	}
 
 	core.SetRegister(int(instr.rd), uint32(value))
+	core.pc += 4
+	return nil
+}
+
+// lhu executes the LHU instruction on the given core.
+func lhu(core *Core, instr iTypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing LHU instruction: %+v\n", instr))
+	address := core.GetRegister(int(instr.rs1)) + uint32(instr.imm)
+
+	var value uint32
+	for i := uint32(0); i < 2; i++ {
+		b, err := core.bus.Read(address + i)
+		if err != nil {
+			return fmt.Errorf("LHU failed at offset %d: %v", i, err)
+		}
+		value |= uint32(b) << (i * 8)
+	}
+
+	core.SetRegister(int(instr.rd), value)
 	core.pc += 4
 	return nil
 }
@@ -736,14 +795,20 @@ func execute(core *Core, instruction uint32) error {
 		return jal(core, parseJType(instruction))
 	case opcode == opcodeSb && func3 == sTypeFunc3Sb:
 		return sb(core, parseSType(instruction))
+	case opcode == opcodeSb && func3 == sTypeFunc3Sh:
+		return sh(core, parseSType(instruction))
 	case opcode == opcodeSb && func3 == sTypeFunc3Sw:
 		return sw(core, parseSType(instruction))
 	case opcode == opcodeLb && func3 == iTypeFunc3Lb:
 		return lb(core, parseIType(instruction))
+	case opcode == opcodeLb && func3 == iTypeFunc3Lh:
+		return lh(core, parseIType(instruction))
 	case opcode == opcodeLb && func3 == iTypeFunc3Lw:
 		return lw(core, parseIType(instruction))
-	case opcode == opcodeLbu && func3 == iTypeFunc3Lbu:
+	case opcode == opcodeLb && func3 == iTypeFunc3Lbu:
 		return lbu(core, parseIType(instruction))
+	case opcode == opcodeLb && func3 == iTypeFunc3Lhu:
+		return lhu(core, parseIType(instruction))
 	case opcode == opcodeBne && func3 == bTypeFunc3Beq:
 		return beq(core, parseBType(instruction))
 	case opcode == opcodeBne && func3 == bTypeFunc3Bne:

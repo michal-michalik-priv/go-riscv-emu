@@ -796,6 +796,75 @@ func TestSb(t *testing.T) {
 	}
 }
 
+func TestSh(t *testing.T) {
+	bus := &devices.Bus{}
+	ramDevice := &devices.RAMDevice{}
+	ramDevice.Initialize(0x2000, 0x100)
+	bus.AddDevice(ramDevice)
+
+	core := NewCore(bus)
+	core.x[1] = 0x2004 // Base address in rs1
+	core.x[2] = 0xABCD // Value to store in rs2
+
+	instr := sTypeInstruction{
+		rs2: 2,    // Source register x2
+		rs1: 1,    // Base register x1
+		imm: 0x00, // Immediate offset
+	}
+
+	err := sh(core, instr)
+	if err != nil {
+		t.Fatalf("sh failed: %v", err)
+	}
+
+	// Verify that the halfword at address 0x2004 is 0xABCD (little-endian)
+	expectedBytes := []byte{0xCD, 0xAB}
+	for i, expected := range expectedBytes {
+		value, err := ramDevice.Read(0x2004 + uint32(i))
+		if err != nil {
+			t.Fatalf("Read failed at offset %d: %v", i, err)
+		}
+		if value != expected {
+			t.Errorf("Expected memory at 0x%X to be %X, got %X", 0x2004+i, expected, value)
+		}
+	}
+}
+
+func TestExecute_Sh(t *testing.T) {
+	bus := &devices.Bus{}
+	ramDevice := &devices.RAMDevice{}
+	ramDevice.Initialize(0x2000, 0x100)
+	bus.AddDevice(ramDevice)
+
+	core := NewCore(bus)
+	core.x[1] = 0x2004 // Base address in rs1
+	core.x[2] = 0xABCD // Value to store in rs2
+
+	// SH x2, 0(x1) -> 0x00209023
+	// rs2=2, rs1=1, funct3=1, imm=0
+	// 0000000 00010 00001 001 00000 0100011
+	// 0000 0000 0010 0000 1001 0000 0010 0011
+	// 0    0    2    0    9    0    2    3
+	instruction := uint32(0x00209023)
+
+	err := execute(core, instruction)
+	if err != nil {
+		t.Fatalf("execute failed: %v", err)
+	}
+
+	// Verify that the halfword at address 0x2004 is 0xABCD (little-endian)
+	expectedBytes := []byte{0xCD, 0xAB}
+	for i, expected := range expectedBytes {
+		value, err := ramDevice.Read(0x2004 + uint32(i))
+		if err != nil {
+			t.Fatalf("Read failed at offset %d: %v", i, err)
+		}
+		if value != expected {
+			t.Errorf("Expected memory at 0x%X to be %X, got %X", 0x2004+i, expected, value)
+		}
+	}
+}
+
 func TestSw(t *testing.T) {
 	bus := &devices.Bus{}
 	ramDevice := &devices.RAMDevice{}
@@ -922,6 +991,79 @@ func TestLb(t *testing.T) {
 	}
 }
 
+func TestLh(t *testing.T) {
+	bus := &devices.Bus{}
+	ramDevice := &devices.RAMDevice{}
+	ramDevice.Initialize(0x4000, 0x100)
+	bus.AddDevice(ramDevice)
+
+	// Write a negative halfword (0xFFFF) to memory at address 0x4004
+	err := ramDevice.Write(0x4004, 0xFF)
+	if err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+	err = ramDevice.Write(0x4005, 0xFF)
+	if err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+
+	core := NewCore(bus)
+	core.x[1] = 0x4000 // Base address in rs1
+
+	instr := iTypeInstruction{
+		rd:  2,    // Destination register x2
+		rs1: 1,    // Source register x1
+		imm: 0x04, // Immediate offset
+	}
+
+	err = lh(core, instr)
+	if err != nil {
+		t.Fatalf("lh failed: %v", err)
+	}
+
+	expected := uint32(0xFFFFFFFF) // Sign-extended 0xFFFF
+	if core.x[2] != expected {
+		t.Errorf("Expected x2 to be %X, got %X", expected, core.x[2])
+	}
+}
+
+func TestExecute_Lh(t *testing.T) {
+	bus := &devices.Bus{}
+	ramDevice := &devices.RAMDevice{}
+	ramDevice.Initialize(0x4000, 0x100)
+	bus.AddDevice(ramDevice)
+
+	// Write 0x1234 to memory at address 0x4004
+	err := ramDevice.Write(0x4004, 0x34)
+	if err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+	err = ramDevice.Write(0x4005, 0x12)
+	if err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+
+	core := NewCore(bus)
+	core.x[1] = 0x4000 // Base address in rs1
+
+	// LH x2, 4(x1)
+	// opcode: 0000011, rd: 2, funct3: 001, rs1: 1, imm: 4
+	// 0000 0000 0100 0000 1 001 00010 0000011
+	// 0000 0000 0100 0000 1001 0001 0000 0011
+	// 0    0    4    0    9    1    0    3
+	instruction := uint32(0x00409103)
+
+	err = execute(core, instruction)
+	if err != nil {
+		t.Fatalf("execute failed: %v", err)
+	}
+
+	expected := uint32(0x1234)
+	if core.x[2] != expected {
+		t.Errorf("Expected x2 to be %X, got %X", expected, core.x[2])
+	}
+}
+
 func TestLbu(t *testing.T) {
 	bus := &devices.Bus{}
 	ramDevice := &devices.RAMDevice{}
@@ -949,6 +1091,79 @@ func TestLbu(t *testing.T) {
 	}
 
 	expected := uint32(0xFF)
+	if core.x[3] != expected {
+		t.Errorf("Expected x3 to be %X, got %X", expected, core.x[3])
+	}
+}
+
+func TestLhu(t *testing.T) {
+	bus := &devices.Bus{}
+	ramDevice := &devices.RAMDevice{}
+	ramDevice.Initialize(0x5000, 0x100)
+	bus.AddDevice(ramDevice)
+
+	// Write a halfword to memory at address 0x5006
+	err := ramDevice.Write(0x5006, 0xFF)
+	if err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+	err = ramDevice.Write(0x5007, 0x7F)
+	if err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+
+	core := NewCore(bus)
+	core.x[1] = 0x5000 // Base address in rs1
+
+	instr := iTypeInstruction{
+		rd:  3,    // Destination register x3
+		rs1: 1,    // Source register x1
+		imm: 0x06, // Immediate offset
+	}
+
+	err = lhu(core, instr)
+	if err != nil {
+		t.Fatalf("lhu failed: %v", err)
+	}
+
+	expected := uint32(0x7FFF)
+	if core.x[3] != expected {
+		t.Errorf("Expected x3 to be %X, got %X", expected, core.x[3])
+	}
+}
+
+func TestExecute_Lhu(t *testing.T) {
+	bus := &devices.Bus{}
+	ramDevice := &devices.RAMDevice{}
+	ramDevice.Initialize(0x5000, 0x100)
+	bus.AddDevice(ramDevice)
+
+	// Write 0xABCD to memory at address 0x5006
+	err := ramDevice.Write(0x5006, 0xCD)
+	if err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+	err = ramDevice.Write(0x5007, 0xAB)
+	if err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+
+	core := NewCore(bus)
+	core.x[1] = 0x5000 // Base address in rs1
+
+	// LHU x3, 6(x1)
+	// opcode: 0000011, rd: 3, funct3: 101, rs1: 1, imm: 6
+	// 0000 0000 0110 0000 1 101 00011 0000011
+	// 0000 0000 0110 0000 1101 0001 1000 0011
+	// 0    0    6    0    D    1    8    3
+	instruction := uint32(0x0060D183)
+
+	err = execute(core, instruction)
+	if err != nil {
+		t.Fatalf("execute failed: %v", err)
+	}
+
+	expected := uint32(0xABCD)
 	if core.x[3] != expected {
 		t.Errorf("Expected x3 to be %X, got %X", expected, core.x[3])
 	}
