@@ -38,6 +38,8 @@ const (
 	iTypeFunc3Lw       = 0b010
 	iTypeFunc3Lbu      = 0b100
 	iTypeFunc3Xori     = 0b100
+	iTypeFunc3Ori      = 0b110
+	iTypeFunc3Andi     = 0b111
 	bTypeFunc3Beq      = 0b000
 	bTypeFunc3Bne      = 0b001
 	bTypeFunc3Blt      = 0b100
@@ -46,6 +48,8 @@ const (
 	rTypeFunc3Slt      = 0b010
 	rTypeFunc3Sltu     = 0b011
 	rTypeFunc3Xor      = 0b100
+	rTypeFunc3Or       = 0b110
+	rTypeFunc3And      = 0b111
 	iTypeFunc3Fence    = 0b000
 	iTypeFunc3Csrrw    = 0b001
 	iTypeFunc3Csrrs    = 0b010
@@ -66,6 +70,8 @@ const (
 	rTypeFunc7Slt  = 0b0000000
 	rTypeFunc7Sltu = 0b0000000
 	rTypeFunc7Xor  = 0b0000000
+	rTypeFunc7Or   = 0b0000000
+	rTypeFunc7And  = 0b0000000
 )
 
 // RISC-V CSR addresses
@@ -274,6 +280,24 @@ func xor(core *Core, instr rTypeInstruction) error {
 	return nil
 }
 
+// or executes the OR instruction on the given core.
+func or(core *Core, instr rTypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing OR instruction: %+v\n", instr))
+	val := core.GetRegister(int(instr.rs1)) | core.GetRegister(int(instr.rs2))
+	core.SetRegister(int(instr.rd), val)
+	core.pc += 4
+	return nil
+}
+
+// and executes the AND instruction on the given core.
+func and(core *Core, instr rTypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing AND instruction: %+v\n", instr))
+	val := core.GetRegister(int(instr.rs1)) & core.GetRegister(int(instr.rs2))
+	core.SetRegister(int(instr.rd), val)
+	core.pc += 4
+	return nil
+}
+
 // fence executes the FENCE instruction on the given core.
 func fence(core *Core, instr iTypeInstruction) error {
 	slog.Debug(fmt.Sprintf("Executing FENCE instruction: %+v\n", instr))
@@ -320,6 +344,24 @@ func sltiu(core *Core, instr iTypeInstruction) error {
 func xori(core *Core, instr iTypeInstruction) error {
 	slog.Debug(fmt.Sprintf("Executing XORI instruction: %+v\n", instr))
 	val := core.GetRegister(int(instr.rs1)) ^ uint32(instr.imm)
+	core.SetRegister(int(instr.rd), val)
+	core.pc += 4
+	return nil
+}
+
+// ori executes the ORI instruction on the given core.
+func ori(core *Core, instr iTypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing ORI instruction: %+v\n", instr))
+	val := core.GetRegister(int(instr.rs1)) | uint32(instr.imm)
+	core.SetRegister(int(instr.rd), val)
+	core.pc += 4
+	return nil
+}
+
+// andi executes the ANDI instruction on the given core.
+func andi(core *Core, instr iTypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing ANDI instruction: %+v\n", instr))
+	val := core.GetRegister(int(instr.rs1)) & uint32(instr.imm)
 	core.SetRegister(int(instr.rd), val)
 	core.pc += 4
 	return nil
@@ -612,6 +654,10 @@ func execute(core *Core, instruction uint32) error {
 		return sltiu(core, parseIType(instruction))
 	case opcode == opcodeAddi && func3 == iTypeFunc3Xori:
 		return xori(core, parseIType(instruction))
+	case opcode == opcodeAddi && func3 == iTypeFunc3Ori:
+		return ori(core, parseIType(instruction))
+	case opcode == opcodeAddi && func3 == iTypeFunc3Andi:
+		return andi(core, parseIType(instruction))
 	case opcode == opcodeAddi && func3 == iTypeFunc3Slli:
 		return slli(core, parseIType(instruction))
 	case opcode == opcodeAddi && func3 == iTypeFunc3SrliSrai:
@@ -671,6 +717,18 @@ func execute(core *Core, instruction uint32) error {
 		instr := parseRType(instruction)
 		if instr.func7 == rTypeFunc7Xor {
 			return xor(core, instr)
+		}
+		return fmt.Errorf("unsupported R-type instruction, %032b", instruction)
+	case opcode == opcodeOp && func3 == rTypeFunc3Or:
+		instr := parseRType(instruction)
+		if instr.func7 == rTypeFunc7Or {
+			return or(core, instr)
+		}
+		return fmt.Errorf("unsupported R-type instruction, %032b", instruction)
+	case opcode == opcodeOp && func3 == rTypeFunc3And:
+		instr := parseRType(instruction)
+		if instr.func7 == rTypeFunc7And {
+			return and(core, instr)
 		}
 		return fmt.Errorf("unsupported R-type instruction, %032b", instruction)
 	case opcode == opcodeMiscMem && func3 == iTypeFunc3Fence:
