@@ -28,6 +28,8 @@ const (
 const (
 	iTypeFunc3Addi     = 0b000
 	iTypeFunc3Slli     = 0b001
+	iTypeFunc3Slti     = 0b010
+	iTypeFunc3Sltiu    = 0b011
 	iTypeFunc3SrliSrai = 0b101
 	iTypeFunc3Jalr     = 0b000
 	sTypeFunc3Sb       = 0b000
@@ -41,6 +43,8 @@ const (
 	bTypeFunc3Blt      = 0b100
 	bTypeFunc3Bltu     = 0b110
 	rTypeFunc3Add      = 0b000
+	rTypeFunc3Slt      = 0b010
+	rTypeFunc3Sltu     = 0b011
 	rTypeFunc3Xor      = 0b100
 	iTypeFunc3Fence    = 0b000
 	iTypeFunc3Csrrw    = 0b001
@@ -57,9 +61,11 @@ const (
 
 // RV32I Funct7 for all instructions
 const (
-	rTypeFunc7Add = 0b0000000
-	rTypeFunc7Sub = 0b0100000
-	rTypeFunc7Xor = 0b0000000
+	rTypeFunc7Add  = 0b0000000
+	rTypeFunc7Sub  = 0b0100000
+	rTypeFunc7Slt  = 0b0000000
+	rTypeFunc7Sltu = 0b0000000
+	rTypeFunc7Xor  = 0b0000000
 )
 
 // RISC-V CSR addresses
@@ -226,6 +232,30 @@ func add(core *Core, instr rTypeInstruction) error {
 	return nil
 }
 
+// slt executes the SLT instruction on the given core.
+func slt(core *Core, instr rTypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing SLT instruction: %+v\n", instr))
+	if int32(core.GetRegister(int(instr.rs1))) < int32(core.GetRegister(int(instr.rs2))) {
+		core.SetRegister(int(instr.rd), 1)
+	} else {
+		core.SetRegister(int(instr.rd), 0)
+	}
+	core.pc += 4
+	return nil
+}
+
+// sltu executes the SLTU instruction on the given core.
+func sltu(core *Core, instr rTypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing SLTU instruction: %+v\n", instr))
+	if core.GetRegister(int(instr.rs1)) < core.GetRegister(int(instr.rs2)) {
+		core.SetRegister(int(instr.rd), 1)
+	} else {
+		core.SetRegister(int(instr.rd), 0)
+	}
+	core.pc += 4
+	return nil
+}
+
 // sub executes the SUB instruction on the given core.
 func sub(core *Core, instr rTypeInstruction) error {
 	slog.Debug(fmt.Sprintf("Executing SUB instruction: %+v\n", instr))
@@ -258,6 +288,30 @@ func addi(core *Core, instr iTypeInstruction) error {
 	slog.Debug(fmt.Sprintf("Executing ADDI instruction: %+v\n", instr))
 	val := core.GetRegister(int(instr.rs1)) + uint32(instr.imm)
 	core.SetRegister(int(instr.rd), val)
+	core.pc += 4
+	return nil
+}
+
+// slti executes the SLTI instruction on the given core.
+func slti(core *Core, instr iTypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing SLTI instruction: %+v\n", instr))
+	if int32(core.GetRegister(int(instr.rs1))) < instr.imm {
+		core.SetRegister(int(instr.rd), 1)
+	} else {
+		core.SetRegister(int(instr.rd), 0)
+	}
+	core.pc += 4
+	return nil
+}
+
+// sltiu executes the SLTIU instruction on the given core.
+func sltiu(core *Core, instr iTypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing SLTIU instruction: %+v\n", instr))
+	if core.GetRegister(int(instr.rs1)) < uint32(instr.imm) {
+		core.SetRegister(int(instr.rd), 1)
+	} else {
+		core.SetRegister(int(instr.rd), 0)
+	}
 	core.pc += 4
 	return nil
 }
@@ -552,6 +606,10 @@ func execute(core *Core, instruction uint32) error {
 	switch {
 	case opcode == opcodeAddi && func3 == iTypeFunc3Addi:
 		return addi(core, parseIType(instruction))
+	case opcode == opcodeAddi && func3 == iTypeFunc3Slti:
+		return slti(core, parseIType(instruction))
+	case opcode == opcodeAddi && func3 == iTypeFunc3Sltiu:
+		return sltiu(core, parseIType(instruction))
 	case opcode == opcodeAddi && func3 == iTypeFunc3Xori:
 		return xori(core, parseIType(instruction))
 	case opcode == opcodeAddi && func3 == iTypeFunc3Slli:
@@ -595,6 +653,18 @@ func execute(core *Core, instruction uint32) error {
 			return add(core, instr)
 		} else if instr.func7 == rTypeFunc7Sub {
 			return sub(core, instr)
+		}
+		return fmt.Errorf("unsupported R-type instruction, %032b", instruction)
+	case opcode == opcodeOp && func3 == rTypeFunc3Slt:
+		instr := parseRType(instruction)
+		if instr.func7 == rTypeFunc7Slt {
+			return slt(core, instr)
+		}
+		return fmt.Errorf("unsupported R-type instruction, %032b", instruction)
+	case opcode == opcodeOp && func3 == rTypeFunc3Sltu:
+		instr := parseRType(instruction)
+		if instr.func7 == rTypeFunc7Sltu {
+			return sltu(core, instr)
 		}
 		return fmt.Errorf("unsupported R-type instruction, %032b", instruction)
 	case opcode == opcodeOp && func3 == rTypeFunc3Xor:

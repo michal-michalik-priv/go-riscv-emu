@@ -7,6 +7,127 @@ import (
 	"github.com/michal-michalik-priv/go-riscv-emu/pkg/devices"
 )
 
+func TestSlti(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+
+	// Case 1: rs1 < imm (signed)
+	core.x[1] = 0xFFFFFFF6 // -10
+	instr := iTypeInstruction{
+		rd:  2,
+		rs1: 1,
+		imm: 5,
+	}
+	err := slti(core, instr)
+	if err != nil {
+		t.Fatalf("slti failed: %v", err)
+	}
+	if core.x[2] != 1 {
+		t.Errorf("Expected x2 to be 1, got %d", core.x[2])
+	}
+
+	// Case 2: rs1 >= imm (signed)
+	core.x[1] = 10
+	err = slti(core, instr)
+	if err != nil {
+		t.Fatalf("slti failed: %v", err)
+	}
+	if core.x[2] != 0 {
+		t.Errorf("Expected x2 to be 0, got %d", core.x[2])
+	}
+}
+
+func TestSltiu(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+
+	// Case 1: rs1 < imm (unsigned)
+	core.x[1] = 5
+	instr := iTypeInstruction{
+		rd:  2,
+		rs1: 1,
+		imm: 10,
+	}
+	err := sltiu(core, instr)
+	if err != nil {
+		t.Fatalf("sltiu failed: %v", err)
+	}
+	if core.x[2] != 1 {
+		t.Errorf("Expected x2 to be 1, got %d", core.x[2])
+	}
+
+	// Case 2: rs1 >= imm (unsigned). Note: imm is sign-extended!
+	// If imm is -1 (0xFFF), it becomes 0xFFFFFFFF unsigned.
+	core.x[1] = 0xFFFFFFFE
+	instr.imm = -1
+	err = sltiu(core, instr)
+	if err != nil {
+		t.Fatalf("sltiu failed: %v", err)
+	}
+	if core.x[2] != 1 { // 0xFFFFFFFE < 0xFFFFFFFF
+		t.Errorf("Expected x2 to be 1, got %d", core.x[2])
+	}
+}
+
+func TestSlt(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+
+	// Case 1: rs1 < rs2 (signed)
+	core.x[1] = 0xFFFFFFF6 // -10
+	core.x[2] = 5
+	instr := rTypeInstruction{
+		rd:  3,
+		rs1: 1,
+		rs2: 2,
+	}
+	err := slt(core, instr)
+	if err != nil {
+		t.Fatalf("slt failed: %v", err)
+	}
+	if core.x[3] != 1 {
+		t.Errorf("Expected x3 to be 1, got %d", core.x[3])
+	}
+
+	// Case 2: rs1 >= rs2 (signed)
+	core.x[1] = 10
+	err = slt(core, instr)
+	if err != nil {
+		t.Fatalf("slt failed: %v", err)
+	}
+	if core.x[3] != 0 {
+		t.Errorf("Expected x3 to be 0, got %d", core.x[3])
+	}
+}
+
+func TestSltu(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+
+	// Case 1: rs1 < rs2 (unsigned)
+	core.x[1] = 5
+	core.x[2] = 0xFFFFFFF6
+	instr := rTypeInstruction{
+		rd:  3,
+		rs1: 1,
+		rs2: 2,
+	}
+	err := sltu(core, instr)
+	if err != nil {
+		t.Fatalf("sltu failed: %v", err)
+	}
+	if core.x[3] != 1 {
+		t.Errorf("Expected x3 to be 1, got %d", core.x[3])
+	}
+
+	// Case 2: rs1 >= rs2 (unsigned)
+	core.x[1] = 0xFFFFFFF6
+	core.x[2] = 5
+	err = sltu(core, instr)
+	if err != nil {
+		t.Fatalf("sltu failed: %v", err)
+	}
+	if core.x[3] != 0 {
+		t.Errorf("Expected x3 to be 0, got %d", core.x[3])
+	}
+}
+
 func TestAddi(t *testing.T) {
 	core := NewCore(&devices.Bus{})
 	core.x[1] = 10 // Set register x1 to 10
@@ -298,6 +419,84 @@ func TestExecute_Xori(t *testing.T) {
 	expected := uint32(0b0110)
 	if core.x[2] != expected {
 		t.Errorf("Expected x2 to be %b, got %b", expected, core.x[2])
+	}
+}
+
+func TestExecute_Slti(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	core.x[1] = 0xFFFFFFF6 // -10
+
+	// SLTI x2, x1, 5
+	// Opcode: 0010011, rd: 2, funct3: 010, rs1: 1, imm: 5
+	// 0x0050A113
+	instruction := uint32(0x0050A113)
+
+	err := execute(core, instruction)
+	if err != nil {
+		t.Fatalf("execute failed: %v", err)
+	}
+
+	if core.x[2] != 1 {
+		t.Errorf("Expected x2 to be 1, got %d", core.x[2])
+	}
+}
+
+func TestExecute_Sltiu(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	core.x[1] = 5
+
+	// SLTIU x2, x1, 10
+	// Opcode: 0010011, rd: 2, funct3: 011, rs1: 1, imm: 10
+	// 0x00A0B113
+	instruction := uint32(0x00A0B113)
+
+	err := execute(core, instruction)
+	if err != nil {
+		t.Fatalf("execute failed: %v", err)
+	}
+
+	if core.x[2] != 1 {
+		t.Errorf("Expected x2 to be 1, got %d", core.x[2])
+	}
+}
+
+func TestExecute_Slt(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	core.x[1] = 0xFFFFFFF6 // -10
+	core.x[2] = 5
+
+	// SLT x3, x1, x2
+	// Opcode: 0110011, rd: 3, funct3: 010, rs1: 1, rs2: 2, funct7: 0000000
+	// 0x0020A1B3
+	instruction := uint32(0x0020A1B3)
+
+	err := execute(core, instruction)
+	if err != nil {
+		t.Fatalf("execute failed: %v", err)
+	}
+
+	if core.x[3] != 1 {
+		t.Errorf("Expected x3 to be 1, got %d", core.x[3])
+	}
+}
+
+func TestExecute_Sltu(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	core.x[1] = 5
+	core.x[2] = 0xFFFFFFF6
+
+	// SLTU x3, x1, x2
+	// Opcode: 0110011, rd: 3, funct3: 011, rs1: 1, rs2: 2, funct7: 0000000
+	// 0x0020B1B3
+	instruction := uint32(0x0020B1B3)
+
+	err := execute(core, instruction)
+	if err != nil {
+		t.Fatalf("execute failed: %v", err)
+	}
+
+	if core.x[3] != 1 {
+		t.Errorf("Expected x3 to be 1, got %d", core.x[3])
 	}
 }
 
