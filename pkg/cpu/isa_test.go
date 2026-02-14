@@ -128,6 +128,28 @@ func TestAdd(t *testing.T) {
 	}
 }
 
+func TestSub(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	core.x[1] = 30
+	core.x[2] = 10
+
+	instr := rTypeInstruction{
+		rd:  3,
+		rs1: 1,
+		rs2: 2,
+	}
+
+	err := sub(core, instr)
+	if err != nil {
+		t.Fatalf("sub failed: %v", err)
+	}
+
+	expected := uint32(20)
+	if core.x[3] != expected {
+		t.Errorf("Expected x3 to be %d, got %d", expected, core.x[3])
+	}
+}
+
 func TestFence(t *testing.T) {
 	core := NewCore(&devices.Bus{})
 	core.pc = 0x1000
@@ -175,6 +197,25 @@ func TestExecute_Add(t *testing.T) {
 	}
 
 	expected := uint32(30)
+	if core.x[3] != expected {
+		t.Errorf("Expected x3 to be %d, got %d", expected, core.x[3])
+	}
+}
+
+func TestExecute_Sub(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	core.x[1] = 30
+	core.x[2] = 10
+
+	// SUB x3, x1, x2 -> 0x402081B3
+	instruction := uint32(0x402081B3)
+
+	err := execute(core, instruction)
+	if err != nil {
+		t.Fatalf("execute failed: %v", err)
+	}
+
+	expected := uint32(20)
 	if core.x[3] != expected {
 		t.Errorf("Expected x3 to be %d, got %d", expected, core.x[3])
 	}

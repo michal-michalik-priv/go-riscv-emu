@@ -54,6 +54,7 @@ const (
 // RV32I Funct7 for all instructions
 const (
 	rTypeFunc7Add = 0b0000000
+	rTypeFunc7Sub = 0b0100000
 )
 
 // RISC-V CSR addresses
@@ -215,6 +216,15 @@ func parseRType(instruction uint32) rTypeInstruction {
 func add(core *Core, instr rTypeInstruction) error {
 	slog.Debug(fmt.Sprintf("Executing ADD instruction: %+v\n", instr))
 	val := core.GetRegister(int(instr.rs1)) + core.GetRegister(int(instr.rs2))
+	core.SetRegister(int(instr.rd), val)
+	core.pc += 4
+	return nil
+}
+
+// sub executes the SUB instruction on the given core.
+func sub(core *Core, instr rTypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing SUB instruction: %+v\n", instr))
+	val := core.GetRegister(int(instr.rs1)) - core.GetRegister(int(instr.rs2))
 	core.SetRegister(int(instr.rd), val)
 	core.pc += 4
 	return nil
@@ -518,6 +528,8 @@ func execute(core *Core, instruction uint32) error {
 		instr := parseRType(instruction)
 		if instr.func7 == rTypeFunc7Add {
 			return add(core, instr)
+		} else if instr.func7 == rTypeFunc7Sub {
+			return sub(core, instr)
 		}
 		return fmt.Errorf("unsupported R-type instruction, %032b", instruction)
 	case opcode == opcodeMiscMem && func3 == iTypeFunc3Fence:
