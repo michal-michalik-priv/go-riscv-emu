@@ -31,7 +31,9 @@ const (
 	iTypeFunc3SrliSrai = 0b101
 	iTypeFunc3Jalr     = 0b000
 	sTypeFunc3Sb       = 0b000
+	sTypeFunc3Sw       = 0b010
 	iTypeFunc3Lb       = 0b000
+	iTypeFunc3Lw       = 0b010
 	iTypeFunc3Lbu      = 0b100
 	iTypeFunc3Xori     = 0b100
 	bTypeFunc3Beq      = 0b000
@@ -308,6 +310,23 @@ func sb(core *Core, instr sTypeInstruction) error {
 	return nil
 }
 
+// sw executes the SW instruction on the given core.
+func sw(core *Core, instr sTypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing SW instruction: %+v\n", instr))
+	address := core.GetRegister(int(instr.rs1)) + uint32(instr.imm)
+	value := core.GetRegister(int(instr.rs2))
+
+	for i := uint32(0); i < 4; i++ {
+		err := core.bus.Write(address+i, byte((value>>(i*8))&0xFF))
+		if err != nil {
+			return fmt.Errorf("SW failed at offset %d: %v", i, err)
+		}
+	}
+
+	core.pc += 4
+	return nil
+}
+
 // jal executes the JAL instruction on the given core.
 func jal(core *Core, instr jTypeInstruction) error {
 	slog.Debug(fmt.Sprintf("Executing JAL instruction: %+v\n", instr))
@@ -342,6 +361,25 @@ func lbu(core *Core, instr iTypeInstruction) error {
 	}
 
 	core.SetRegister(int(instr.rd), uint32(value))
+	core.pc += 4
+	return nil
+}
+
+// lw executes the LW instruction on the given core.
+func lw(core *Core, instr iTypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing LW instruction: %+v\n", instr))
+	address := core.GetRegister(int(instr.rs1)) + uint32(instr.imm)
+
+	var value uint32
+	for i := uint32(0); i < 4; i++ {
+		b, err := core.bus.Read(address + i)
+		if err != nil {
+			return fmt.Errorf("LW failed at offset %d: %v", i, err)
+		}
+		value |= uint32(b) << (i * 8)
+	}
+
+	core.SetRegister(int(instr.rd), value)
 	core.pc += 4
 	return nil
 }
@@ -535,8 +573,12 @@ func execute(core *Core, instruction uint32) error {
 		return jal(core, parseJType(instruction))
 	case opcode == opcodeSb && func3 == sTypeFunc3Sb:
 		return sb(core, parseSType(instruction))
+	case opcode == opcodeSb && func3 == sTypeFunc3Sw:
+		return sw(core, parseSType(instruction))
 	case opcode == opcodeLb && func3 == iTypeFunc3Lb:
 		return lb(core, parseIType(instruction))
+	case opcode == opcodeLb && func3 == iTypeFunc3Lw:
+		return lw(core, parseIType(instruction))
 	case opcode == opcodeLbu && func3 == iTypeFunc3Lbu:
 		return lbu(core, parseIType(instruction))
 	case opcode == opcodeBne && func3 == bTypeFunc3Beq:
