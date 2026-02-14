@@ -551,6 +551,45 @@ func TestExecute_Sret(t *testing.T) {
 	}
 }
 
+func TestExecute_Ecall(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+
+	// ECALL -> 0x00000073
+	instruction := uint32(0x00000073)
+	err := execute(core, instruction)
+	if err == nil {
+		t.Fatal("Expected error from ECALL, got nil")
+	}
+
+	if err.Error() != "ECALL triggered" {
+		t.Errorf("Expected 'ECALL triggered' error, got %v", err)
+	}
+}
+
+func TestExecute_Unimp(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+
+	// UNIMP (0x00000000)
+	instruction := uint32(0x00000000)
+	err := execute(core, instruction)
+	if err == nil {
+		t.Fatal("Expected error from UNIMP (0x00000000), got nil")
+	}
+	if !strings.Contains(err.Error(), "UNIMP instruction encountered") {
+		t.Errorf("Unexpected error message: %v", err)
+	}
+
+	// UNIMP (0xC0001073)
+	instruction = uint32(0xC0001073)
+	err = execute(core, instruction)
+	if err == nil {
+		t.Fatal("Expected error from UNIMP (0xC0001073), got nil")
+	}
+	if !strings.Contains(err.Error(), "UNIMP instruction encountered") {
+		t.Errorf("Unexpected error message: %v", err)
+	}
+}
+
 func TestExecute_Bne(t *testing.T) {
 	core := NewCore(&devices.Bus{})
 	core.pc = 0x3000

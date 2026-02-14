@@ -3,6 +3,7 @@ package cpu
 import (
 	"fmt"
 	"log/slog"
+	"os"
 
 	utils "github.com/michal-michalik-priv/go-riscv-emu/pkg/utils"
 )
@@ -45,8 +46,9 @@ const (
 
 // RV32I Privileged instruction immediate selectors
 const (
-	privImmSret = 0x102
-	privImmMret = 0x302
+	privImmEcall = 0x000
+	privImmSret  = 0x102
+	privImmMret  = 0x302
 )
 
 // RV32I Funct7 for all instructions
@@ -60,6 +62,12 @@ const (
 	csrMstatus = 0x300
 	csrMepc    = 0x341
 	csrMcause  = 0x342
+)
+
+// RISC-V Special instruction encodings
+const (
+	instrUnimp0      = 0x00000000
+	instrUnimpPseudo = 0xC0001073
 )
 
 // iTypeInstruction represents a parsed I-type instruction
@@ -422,6 +430,28 @@ func sret(core *Core) error {
 	return nil
 }
 
+// ecall executes the ECALL instruction on the given core.
+func ecall(core *Core) error {
+	slog.Debug("Executing ECALL instruction")
+	a10 := core.GetRegister(10)
+	a17 := core.GetRegister(17)
+	sysc := uint32(93)
+	if a10 == 0 && a17 == sysc {
+		slog.Info("TESTS PASSED")
+		os.Exit(0)
+	} else if a10 != 0 && a17 == sysc {
+		slog.Info(fmt.Sprintf("TESTS FAILED (no. %+v)", a10))
+		os.Exit(1)
+	}
+	return fmt.Errorf("ECALL triggered")
+}
+
+// unimp executes the UNIMP pseudo-instruction on the given core.
+func unimp(core *Core, instruction uint32) error {
+	slog.Debug(fmt.Sprintf("Executing UNIMP instruction: %08X", instruction))
+	return fmt.Errorf("UNIMP instruction encountered")
+}
+
 // csrrs executes the CSRRS instruction on the given core.
 func csrrs(core *Core, instr iTypeInstruction) error {
 	slog.Debug(fmt.Sprintf("Executing CSRRS instruction: %+v\n", instr))
@@ -495,6 +525,8 @@ func execute(core *Core, instruction uint32) error {
 	case opcode == opcodeSystem && func3 == 0:
 		instr := parseIType(instruction)
 		switch instr.imm {
+		case privImmEcall:
+			return ecall(core)
 		case privImmMret:
 			return mret(core)
 		case privImmSret:
@@ -502,6 +534,8 @@ func execute(core *Core, instruction uint32) error {
 		default:
 			return fmt.Errorf("unsupported system instruction, %032b", instruction)
 		}
+	case instruction == instrUnimp0 || instruction == instrUnimpPseudo:
+		return unimp(core, instruction)
 	case opcode == opcodeSystem && func3 == iTypeFunc3Csrrw:
 		return csrrw(core, parseIType(instruction))
 	case opcode == opcodeSystem && func3 == iTypeFunc3Csrrwi:
