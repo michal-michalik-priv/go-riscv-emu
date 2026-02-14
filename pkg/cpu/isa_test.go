@@ -150,6 +150,49 @@ func TestSub(t *testing.T) {
 	}
 }
 
+func TestXor(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	core.x[1] = 0b1010
+	core.x[2] = 0b1100
+
+	instr := rTypeInstruction{
+		rd:  3,
+		rs1: 1,
+		rs2: 2,
+	}
+
+	err := xor(core, instr)
+	if err != nil {
+		t.Fatalf("xor failed: %v", err)
+	}
+
+	expected := uint32(0b0110)
+	if core.x[3] != expected {
+		t.Errorf("Expected x3 to be %b, got %b", expected, core.x[3])
+	}
+}
+
+func TestXori(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	core.x[1] = 0b1010
+
+	instr := iTypeInstruction{
+		rd:  2,
+		rs1: 1,
+		imm: 0b1100,
+	}
+
+	err := xori(core, instr)
+	if err != nil {
+		t.Fatalf("xori failed: %v", err)
+	}
+
+	expected := uint32(0b0110)
+	if core.x[2] != expected {
+		t.Errorf("Expected x2 to be %b, got %b", expected, core.x[2])
+	}
+}
+
 func TestFence(t *testing.T) {
 	core := NewCore(&devices.Bus{})
 	core.pc = 0x1000
@@ -218,6 +261,43 @@ func TestExecute_Sub(t *testing.T) {
 	expected := uint32(20)
 	if core.x[3] != expected {
 		t.Errorf("Expected x3 to be %d, got %d", expected, core.x[3])
+	}
+}
+
+func TestExecute_Xor(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	core.x[1] = 0b1010
+	core.x[2] = 0b1100
+
+	// XOR x3, x1, x2 -> 0x0020C1B3
+	instruction := uint32(0x0020C1B3)
+
+	err := execute(core, instruction)
+	if err != nil {
+		t.Fatalf("execute failed: %v", err)
+	}
+
+	expected := uint32(0b0110)
+	if core.x[3] != expected {
+		t.Errorf("Expected x3 to be %b, got %b", expected, core.x[3])
+	}
+}
+
+func TestExecute_Xori(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	core.x[1] = 0b1010
+
+	// XORI x2, x1, 0b1100 -> 0x00C0C113
+	instruction := uint32(0x00C0C113)
+
+	err := execute(core, instruction)
+	if err != nil {
+		t.Fatalf("execute failed: %v", err)
+	}
+
+	expected := uint32(0b0110)
+	if core.x[2] != expected {
+		t.Errorf("Expected x2 to be %b, got %b", expected, core.x[2])
 	}
 }
 

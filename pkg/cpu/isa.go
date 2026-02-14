@@ -33,11 +33,13 @@ const (
 	sTypeFunc3Sb       = 0b000
 	iTypeFunc3Lb       = 0b000
 	iTypeFunc3Lbu      = 0b100
+	iTypeFunc3Xori     = 0b100
 	bTypeFunc3Beq      = 0b000
 	bTypeFunc3Bne      = 0b001
 	bTypeFunc3Blt      = 0b100
 	bTypeFunc3Bltu     = 0b110
 	rTypeFunc3Add      = 0b000
+	rTypeFunc3Xor      = 0b100
 	iTypeFunc3Fence    = 0b000
 	iTypeFunc3Csrrw    = 0b001
 	iTypeFunc3Csrrs    = 0b010
@@ -55,6 +57,7 @@ const (
 const (
 	rTypeFunc7Add = 0b0000000
 	rTypeFunc7Sub = 0b0100000
+	rTypeFunc7Xor = 0b0000000
 )
 
 // RISC-V CSR addresses
@@ -230,6 +233,15 @@ func sub(core *Core, instr rTypeInstruction) error {
 	return nil
 }
 
+// xor executes the XOR instruction on the given core.
+func xor(core *Core, instr rTypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing XOR instruction: %+v\n", instr))
+	val := core.GetRegister(int(instr.rs1)) ^ core.GetRegister(int(instr.rs2))
+	core.SetRegister(int(instr.rd), val)
+	core.pc += 4
+	return nil
+}
+
 // fence executes the FENCE instruction on the given core.
 func fence(core *Core, instr iTypeInstruction) error {
 	slog.Debug(fmt.Sprintf("Executing FENCE instruction: %+v\n", instr))
@@ -243,6 +255,15 @@ func fence(core *Core, instr iTypeInstruction) error {
 func addi(core *Core, instr iTypeInstruction) error {
 	slog.Debug(fmt.Sprintf("Executing ADDI instruction: %+v\n", instr))
 	val := core.GetRegister(int(instr.rs1)) + uint32(instr.imm)
+	core.SetRegister(int(instr.rd), val)
+	core.pc += 4
+	return nil
+}
+
+// xori executes the XORI instruction on the given core.
+func xori(core *Core, instr iTypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing XORI instruction: %+v\n", instr))
+	val := core.GetRegister(int(instr.rs1)) ^ uint32(instr.imm)
 	core.SetRegister(int(instr.rd), val)
 	core.pc += 4
 	return nil
@@ -493,6 +514,8 @@ func execute(core *Core, instruction uint32) error {
 	switch {
 	case opcode == opcodeAddi && func3 == iTypeFunc3Addi:
 		return addi(core, parseIType(instruction))
+	case opcode == opcodeAddi && func3 == iTypeFunc3Xori:
+		return xori(core, parseIType(instruction))
 	case opcode == opcodeAddi && func3 == iTypeFunc3Slli:
 		return slli(core, parseIType(instruction))
 	case opcode == opcodeAddi && func3 == iTypeFunc3SrliSrai:
@@ -530,6 +553,12 @@ func execute(core *Core, instruction uint32) error {
 			return add(core, instr)
 		} else if instr.func7 == rTypeFunc7Sub {
 			return sub(core, instr)
+		}
+		return fmt.Errorf("unsupported R-type instruction, %032b", instruction)
+	case opcode == opcodeOp && func3 == rTypeFunc3Xor:
+		instr := parseRType(instruction)
+		if instr.func7 == rTypeFunc7Xor {
+			return xor(core, instr)
 		}
 		return fmt.Errorf("unsupported R-type instruction, %032b", instruction)
 	case opcode == opcodeMiscMem && func3 == iTypeFunc3Fence:
