@@ -50,6 +50,7 @@ const (
 	bTypeFunc3Bltu     = 0b110
 	bTypeFunc3Bgeu     = 0b111
 	rTypeFunc3Add      = 0b000
+	rTypeFunc3Sll      = 0b001
 	rTypeFunc3Slt      = 0b010
 	rTypeFunc3Sltu     = 0b011
 	rTypeFunc3Xor      = 0b100
@@ -73,6 +74,7 @@ const (
 const (
 	rTypeFunc7Add  = 0b0000000
 	rTypeFunc7Sub  = 0b0100000
+	rTypeFunc7Sll  = 0b0000000
 	rTypeFunc7Slt  = 0b0000000
 	rTypeFunc7Sltu = 0b0000000
 	rTypeFunc7Xor  = 0b0000000
@@ -241,6 +243,16 @@ func parseRType(instruction uint32) rTypeInstruction {
 func add(core *Core, instr rTypeInstruction) error {
 	slog.Debug(fmt.Sprintf("Executing ADD instruction: %+v\n", instr))
 	val := core.GetRegister(int(instr.rs1)) + core.GetRegister(int(instr.rs2))
+	core.SetRegister(int(instr.rd), val)
+	core.pc += 4
+	return nil
+}
+
+// sll executes the SLL instruction on the given core.
+func sll(core *Core, instr rTypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing SLL instruction: %+v\n", instr))
+	shamt := core.GetRegister(int(instr.rs2)) & 0x1F
+	val := core.GetRegister(int(instr.rs1)) << shamt
 	core.SetRegister(int(instr.rd), val)
 	core.pc += 4
 	return nil
@@ -827,6 +839,12 @@ func execute(core *Core, instruction uint32) error {
 			return add(core, instr)
 		} else if instr.func7 == rTypeFunc7Sub {
 			return sub(core, instr)
+		}
+		return fmt.Errorf("unsupported R-type instruction, %032b", instruction)
+	case opcode == opcodeOp && func3 == rTypeFunc3Sll:
+		instr := parseRType(instruction)
+		if instr.func7 == rTypeFunc7Sll {
+			return sll(core, instr)
 		}
 		return fmt.Errorf("unsupported R-type instruction, %032b", instruction)
 	case opcode == opcodeOp && func3 == rTypeFunc3Slt:

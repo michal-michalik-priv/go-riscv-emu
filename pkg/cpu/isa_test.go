@@ -170,6 +170,28 @@ func TestSlli(t *testing.T) {
 	}
 }
 
+func TestSll(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	core.x[1] = 2 // Set register x1 to 2
+	core.x[2] = 4 // Set register x2 to 4 (shift amount)
+
+	instr := rTypeInstruction{
+		rd:  3, // Destination register x3
+		rs1: 1, // Source register x1
+		rs2: 2, // Source register x2
+	}
+
+	err := sll(core, instr)
+	if err != nil {
+		t.Fatalf("sll failed: %v", err)
+	}
+
+	expected := uint32(32) // 2 << 4
+	if core.x[3] != expected {
+		t.Errorf("Expected x3 to be %d, got %d", expected, core.x[3])
+	}
+}
+
 func TestExecute_Slli(t *testing.T) {
 	core := NewCore(&devices.Bus{})
 	core.x[1] = 2
@@ -185,6 +207,25 @@ func TestExecute_Slli(t *testing.T) {
 	expected := uint32(32)
 	if core.x[2] != expected {
 		t.Errorf("Expected x2 to be %d, got %d", expected, core.x[2])
+	}
+}
+
+func TestExecute_Sll(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	core.x[1] = 2
+	core.x[2] = 4
+
+	// SLL x3, x1, x2 -> 0x002091B3
+	instruction := uint32(0x002091B3)
+
+	err := execute(core, instruction)
+	if err != nil {
+		t.Fatalf("execute failed: %v", err)
+	}
+
+	expected := uint32(32)
+	if core.x[3] != expected {
+		t.Errorf("Expected x3 to be %d, got %d", expected, core.x[3])
 	}
 }
 
