@@ -57,6 +57,14 @@ const (
 	rTypeFunc3SrlSra   = 0b101
 	rTypeFunc3Or       = 0b110
 	rTypeFunc3And      = 0b111
+	rTypeFunc3Mul      = 0b000
+	rTypeFunc3Mulh     = 0b001
+	rTypeFunc3Mulhsu   = 0b010
+	rTypeFunc3Mulhu    = 0b011
+	rTypeFunc3Div      = 0b100
+	rTypeFunc3Divu     = 0b101
+	rTypeFunc3Rem      = 0b110
+	rTypeFunc3Remu     = 0b111
 	iTypeFunc3Fence    = 0b000
 	iTypeFunc3FenceI   = 0b001
 	iTypeFunc3Csrrw    = 0b001
@@ -86,6 +94,7 @@ const (
 	rTypeFunc7Sra  = 0b0100000
 	rTypeFunc7Or   = 0b0000000
 	rTypeFunc7And  = 0b0000000
+	rTypeFunc7M    = 0b0000001
 )
 
 // RISC-V CSR addresses
@@ -848,6 +857,106 @@ func csrrci(core *Core, instr iTypeInstruction) error {
 	return nil
 }
 
+// mul executes the MUL instruction on the given core.
+func mul(core *Core, instr rTypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing MUL instruction: %+v\n", instr))
+	val := core.GetRegister(int(instr.rs1)) * core.GetRegister(int(instr.rs2))
+	core.SetRegister(int(instr.rd), val)
+	core.pc += 4
+	return nil
+}
+
+// mulh executes the MULH instruction on the given core.
+func mulh(core *Core, instr rTypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing MULH instruction: %+v\n", instr))
+	res := int64(int32(core.GetRegister(int(instr.rs1)))) * int64(int32(core.GetRegister(int(instr.rs2))))
+	core.SetRegister(int(instr.rd), uint32(res>>32))
+	core.pc += 4
+	return nil
+}
+
+// mulhsu executes the MULHSU instruction on the given core.
+func mulhsu(core *Core, instr rTypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing MULHSU instruction: %+v\n", instr))
+	res := int64(int32(core.GetRegister(int(instr.rs1)))) * int64(uint64(core.GetRegister(int(instr.rs2))))
+	core.SetRegister(int(instr.rd), uint32(res>>32))
+	core.pc += 4
+	return nil
+}
+
+// mulhu executes the MULHU instruction on the given core.
+func mulhu(core *Core, instr rTypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing MULHU instruction: %+v\n", instr))
+	res := uint64(core.GetRegister(int(instr.rs1))) * uint64(core.GetRegister(int(instr.rs2)))
+	core.SetRegister(int(instr.rd), uint32(res>>32))
+	core.pc += 4
+	return nil
+}
+
+// div executes the DIV instruction on the given core.
+func div(core *Core, instr rTypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing DIV instruction: %+v\n", instr))
+	dividend := int32(core.GetRegister(int(instr.rs1)))
+	divisor := int32(core.GetRegister(int(instr.rs2)))
+
+	if divisor == 0 {
+		core.SetRegister(int(instr.rd), 0xFFFFFFFF)
+	} else if dividend == -2147483648 && divisor == -1 {
+		core.SetRegister(int(instr.rd), uint32(dividend))
+	} else {
+		core.SetRegister(int(instr.rd), uint32(dividend/divisor))
+	}
+	core.pc += 4
+	return nil
+}
+
+// divu executes the DIVU instruction on the given core.
+func divu(core *Core, instr rTypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing DIVU instruction: %+v\n", instr))
+	dividend := core.GetRegister(int(instr.rs1))
+	divisor := core.GetRegister(int(instr.rs2))
+
+	if divisor == 0 {
+		core.SetRegister(int(instr.rd), 0xFFFFFFFF)
+	} else {
+		core.SetRegister(int(instr.rd), dividend/divisor)
+	}
+	core.pc += 4
+	return nil
+}
+
+// rem executes the REM instruction on the given core.
+func rem(core *Core, instr rTypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing REM instruction: %+v\n", instr))
+	dividend := int32(core.GetRegister(int(instr.rs1)))
+	divisor := int32(core.GetRegister(int(instr.rs2)))
+
+	if divisor == 0 {
+		core.SetRegister(int(instr.rd), uint32(dividend))
+	} else if dividend == -2147483648 && divisor == -1 {
+		core.SetRegister(int(instr.rd), 0)
+	} else {
+		core.SetRegister(int(instr.rd), uint32(dividend%divisor))
+	}
+	core.pc += 4
+	return nil
+}
+
+// remu executes the REMU instruction on the given core.
+func remu(core *Core, instr rTypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing REMU instruction: %+v\n", instr))
+	dividend := core.GetRegister(int(instr.rs1))
+	divisor := core.GetRegister(int(instr.rs2))
+
+	if divisor == 0 {
+		core.SetRegister(int(instr.rd), dividend)
+	} else {
+		core.SetRegister(int(instr.rd), dividend%divisor)
+	}
+	core.pc += 4
+	return nil
+}
+
 // Parse parses a 32-bit instruction word and returns the corresponding
 // instruction struct based on the opcode and funct3 fields.
 func execute(core *Core, instruction uint32) error {
@@ -920,42 +1029,56 @@ func execute(core *Core, instruction uint32) error {
 			return add(core, instr)
 		} else if instr.func7 == rTypeFunc7Sub {
 			return sub(core, instr)
+		} else if instr.func7 == rTypeFunc7M {
+			return mul(core, instr)
 		}
 		return fmt.Errorf("unsupported R-type instruction, %032b", instruction)
 	case opcode == opcodeOp && func3 == rTypeFunc3Sll:
 		instr := parseRType(instruction)
 		if instr.func7 == rTypeFunc7Sll {
 			return sll(core, instr)
+		} else if instr.func7 == rTypeFunc7M {
+			return mulh(core, instr)
 		}
 		return fmt.Errorf("unsupported R-type instruction, %032b", instruction)
 	case opcode == opcodeOp && func3 == rTypeFunc3Slt:
 		instr := parseRType(instruction)
 		if instr.func7 == rTypeFunc7Slt {
 			return slt(core, instr)
+		} else if instr.func7 == rTypeFunc7M {
+			return mulhsu(core, instr)
 		}
 		return fmt.Errorf("unsupported R-type instruction, %032b", instruction)
 	case opcode == opcodeOp && func3 == rTypeFunc3Sltu:
 		instr := parseRType(instruction)
 		if instr.func7 == rTypeFunc7Sltu {
 			return sltu(core, instr)
+		} else if instr.func7 == rTypeFunc7M {
+			return mulhu(core, instr)
 		}
 		return fmt.Errorf("unsupported R-type instruction, %032b", instruction)
 	case opcode == opcodeOp && func3 == rTypeFunc3Xor:
 		instr := parseRType(instruction)
 		if instr.func7 == rTypeFunc7Xor {
 			return xor(core, instr)
+		} else if instr.func7 == rTypeFunc7M {
+			return div(core, instr)
 		}
 		return fmt.Errorf("unsupported R-type instruction, %032b", instruction)
 	case opcode == opcodeOp && func3 == rTypeFunc3Or:
 		instr := parseRType(instruction)
 		if instr.func7 == rTypeFunc7Or {
 			return or(core, instr)
+		} else if instr.func7 == rTypeFunc7M {
+			return rem(core, instr)
 		}
 		return fmt.Errorf("unsupported R-type instruction, %032b", instruction)
 	case opcode == opcodeOp && func3 == rTypeFunc3And:
 		instr := parseRType(instruction)
 		if instr.func7 == rTypeFunc7And {
 			return and(core, instr)
+		} else if instr.func7 == rTypeFunc7M {
+			return remu(core, instr)
 		}
 		return fmt.Errorf("unsupported R-type instruction, %032b", instruction)
 	case opcode == opcodeOp && func3 == rTypeFunc3SrlSra:
@@ -964,6 +1087,8 @@ func execute(core *Core, instruction uint32) error {
 			return srl(core, instr)
 		} else if instr.func7 == rTypeFunc7Sra {
 			return sra(core, instr)
+		} else if instr.func7 == rTypeFunc7M {
+			return divu(core, instr)
 		}
 		return fmt.Errorf("unsupported R-type instruction, %032b", instruction)
 	case opcode == opcodeMiscMem && func3 == iTypeFunc3Fence:

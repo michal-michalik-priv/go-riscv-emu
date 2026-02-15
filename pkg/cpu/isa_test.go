@@ -2188,6 +2188,148 @@ func TestParseRType(t *testing.T) {
 	}
 }
 
+func TestMul(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	core.x[1] = 10
+	core.x[2] = 20
+	instr := rTypeInstruction{rd: 3, rs1: 1, rs2: 2}
+	mul(core, instr)
+	if core.x[3] != 200 {
+		t.Errorf("Expected 200, got %d", core.x[3])
+	}
+}
+
+func TestMulh(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	core.x[1] = 0x80000000 // -2^31
+	core.x[2] = 0x80000000 // -2^31
+	instr := rTypeInstruction{rd: 3, rs1: 1, rs2: 2}
+	mulh(core, instr)
+	// -2^31 * -2^31 = 2^62
+	// 2^62 = 0x4000000000000000
+	// Upper 32 bits: 0x40000000
+	if core.x[3] != 0x40000000 {
+		t.Errorf("Expected 0x40000000, got %08X", core.x[3])
+	}
+}
+
+func TestMulhu(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	core.x[1] = 0xFFFFFFFF
+	core.x[2] = 0xFFFFFFFF
+	instr := rTypeInstruction{rd: 3, rs1: 1, rs2: 2}
+	mulhu(core, instr)
+	// (2^32-1)^2 = 2^64 - 2^33 + 1
+	// Upper 32 bits of 2^64 - 2^33 + 1:
+	// 0xFFFFFFFF * 0xFFFFFFFF = 0xFFFFFFFE00000001
+	// Upper 32 bits: 0xFFFFFFFE
+	if core.x[3] != 0xFFFFFFFE {
+		t.Errorf("Expected 0xFFFFFFFE, got %08X", core.x[3])
+	}
+}
+
+func TestMulhsu(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	core.x[1] = 0xFFFFFFFF // -1 signed
+	core.x[2] = 0xFFFFFFFF // 2^32-1 unsigned
+	instr := rTypeInstruction{rd: 3, rs1: 1, rs2: 2}
+	mulhsu(core, instr)
+	// -1 * (2^32-1) = -2^32 + 1
+	// -2^32 + 1 = 0xFFFFFFFF00000001 (as 64-bit signed)
+	// Upper 32 bits: 0xFFFFFFFF
+	if core.x[3] != 0xFFFFFFFF {
+		t.Errorf("Expected 0xFFFFFFFF, got %08X", core.x[3])
+	}
+}
+
+func TestDiv(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+
+	// Case 1: Normal
+	core.x[1] = 20
+	core.x[2] = 5
+	div(core, rTypeInstruction{rd: 3, rs1: 1, rs2: 2})
+	if core.x[3] != 4 {
+		t.Errorf("Expected 4, got %d", core.x[3])
+	}
+
+	// Case 2: Division by zero
+	core.x[2] = 0
+	div(core, rTypeInstruction{rd: 3, rs1: 1, rs2: 2})
+	if core.x[3] != 0xFFFFFFFF {
+		t.Errorf("Expected -1, got %08X", core.x[3])
+	}
+
+	// Case 3: Overflow
+	core.x[1] = 0x80000000 // -2^31
+	core.x[2] = 0xFFFFFFFF // -1
+	div(core, rTypeInstruction{rd: 3, rs1: 1, rs2: 2})
+	if core.x[3] != 0x80000000 {
+		t.Errorf("Expected -2^31, got %08X", core.x[3])
+	}
+}
+
+func TestDivu(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	core.x[1] = 20
+	core.x[2] = 5
+	divu(core, rTypeInstruction{rd: 3, rs1: 1, rs2: 2})
+	if core.x[3] != 4 {
+		t.Errorf("Expected 4, got %d", core.x[3])
+	}
+
+	core.x[2] = 0
+	divu(core, rTypeInstruction{rd: 3, rs1: 1, rs2: 2})
+	if core.x[3] != 0xFFFFFFFF {
+		t.Errorf("Expected 2^32-1, got %08X", core.x[3])
+	}
+}
+
+func TestRem(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	core.x[1] = 20
+	core.x[2] = 6
+	rem(core, rTypeInstruction{rd: 3, rs1: 1, rs2: 2})
+	if core.x[3] != 2 {
+		t.Errorf("Expected 2, got %d", core.x[3])
+	}
+
+	core.x[2] = 0
+	rem(core, rTypeInstruction{rd: 3, rs1: 1, rs2: 2})
+	if core.x[3] != 20 {
+		t.Errorf("Expected 20, got %d", core.x[3])
+	}
+}
+
+func TestRemu(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	core.x[1] = 20
+	core.x[2] = 6
+	remu(core, rTypeInstruction{rd: 3, rs1: 1, rs2: 2})
+	if core.x[3] != 2 {
+		t.Errorf("Expected 2, got %d", core.x[3])
+	}
+
+	core.x[2] = 0
+	remu(core, rTypeInstruction{rd: 3, rs1: 1, rs2: 2})
+	if core.x[3] != 20 {
+		t.Errorf("Expected 20, got %d", core.x[3])
+	}
+}
+
+func TestExecute_Mul(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	core.x[1] = 10
+	core.x[2] = 20
+	// MUL x3, x1, x2 -> opcode=0x33, rd=3, func3=0, rs1=1, rs2=2, func7=0x01
+	// 0000001 00010 00001 000 00011 0110011
+	// 0x022081B3
+	execute(core, 0x022081B3)
+	if core.x[3] != 200 {
+		t.Errorf("Expected 200, got %d", core.x[3])
+	}
+}
+
 func TestBge(t *testing.T) {
 	core := NewCore(&devices.Bus{})
 	core.pc = 0x3000
