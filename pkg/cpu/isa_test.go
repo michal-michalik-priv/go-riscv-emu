@@ -457,12 +457,49 @@ func TestFence(t *testing.T) {
 	}
 }
 
+func TestFenceI(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	core.pc = 0x1000
+
+	instr := iTypeInstruction{} // Fields don't matter for NOP implementation
+
+	err := fenceI(core, instr)
+	if err != nil {
+		t.Fatalf("fenceI failed: %v", err)
+	}
+
+	if core.pc != 0x1004 {
+		t.Errorf("Expected PC to be 0x1004, got %X", core.pc)
+	}
+}
+
 func TestExecute_Fence(t *testing.T) {
 	core := NewCore(&devices.Bus{})
 	core.pc = 0x1000
 
 	// FENCE -> 0x0ff0000f
 	instruction := uint32(0x0ff0000f)
+
+	err := execute(core, instruction)
+	if err != nil {
+		t.Fatalf("execute failed: %v", err)
+	}
+
+	if core.pc != 0x1004 {
+		t.Errorf("Expected PC to be 0x1004, got %X", core.pc)
+	}
+}
+
+func TestExecute_FenceI(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	core.pc = 0x1000
+
+	// FENCE.I -> 0x0000100f
+	// opcode: 0001111 (0x0F), funct3: 001, rd: 0, rs1: 0, imm: 0
+	// 0000 0000 0000 0000 0 001 00000 0001111
+	// 0000 0000 0000 0000 0001 0000 0000 1111
+	// 0    0    0    0    1    0    0    F
+	instruction := uint32(0x0000100F)
 
 	err := execute(core, instruction)
 	if err != nil {

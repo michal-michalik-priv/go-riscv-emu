@@ -58,6 +58,7 @@ const (
 	rTypeFunc3Or       = 0b110
 	rTypeFunc3And      = 0b111
 	iTypeFunc3Fence    = 0b000
+	iTypeFunc3FenceI   = 0b001
 	iTypeFunc3Csrrw    = 0b001
 	iTypeFunc3Csrrs    = 0b010
 	iTypeFunc3Csrrwi   = 0b101
@@ -323,6 +324,15 @@ func fence(core *Core, instr iTypeInstruction) error {
 	slog.Debug(fmt.Sprintf("Executing FENCE instruction: %+v\n", instr))
 	// TODO: In case multicore support would be added, we need to be
 	// more smart than simply advancing the PC...
+	core.pc += 4
+	return nil
+}
+
+// fenceI executes the FENCE.I instruction on the given core.
+func fenceI(core *Core, instr iTypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing FENCE.I instruction: %+v\n", instr))
+	// TODO: In case instruction cache would be added, we need to
+	// flush it here.
 	core.pc += 4
 	return nil
 }
@@ -887,6 +897,8 @@ func execute(core *Core, instruction uint32) error {
 		return fmt.Errorf("unsupported R-type instruction, %032b", instruction)
 	case opcode == opcodeMiscMem && func3 == iTypeFunc3Fence:
 		return fence(core, parseIType(instruction))
+	case opcode == opcodeMiscMem && func3 == iTypeFunc3FenceI:
+		return fenceI(core, parseIType(instruction))
 	case opcode == opcodeSystem && func3 == 0:
 		instr := parseIType(instruction)
 		switch instr.imm {
