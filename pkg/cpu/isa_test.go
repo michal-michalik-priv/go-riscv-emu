@@ -1945,6 +1945,161 @@ func TestExecute_Csrrs(t *testing.T) {
 	}
 }
 
+func TestCsrrc(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	csrAddr := uint32(csrMstatus)
+	core.csrs[csrAddr] = 0xF
+	core.x[1] = 0x8 // bit to clear
+
+	instr := iTypeInstruction{
+		rd:  2,
+		rs1: 1,
+		imm: int32(csrAddr),
+	}
+
+	err := csrrc(core, instr)
+	if err != nil {
+		t.Fatalf("csrrc failed: %v", err)
+	}
+
+	if core.x[2] != 0xF {
+		t.Errorf("Expected x2 to be 0xF, got %X", core.x[2])
+	}
+	if core.csrs[csrAddr] != 0x7 { // 0xF &^ 0x8
+		t.Errorf("Expected CSR 0x300 to be 0x7, got %X", core.csrs[csrAddr])
+	}
+}
+
+func TestExecute_Csrrc(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	csrAddr := uint32(csrMcause)
+	core.csrs[csrAddr] = 0xF
+	core.x[10] = 0x2
+
+	// CSRRC x11, mcause, x10
+	// opcode: 1110011 (73)
+	// rd: 11 (0x0B)
+	// funct3: 011 (3)
+	// rs1: 10 (0x0A)
+	// csr: 0x342
+	// 0x342 0A 3 0B 73 -> 0x342535F3
+	instruction := uint32(0x342535F3)
+
+	err := execute(core, instruction)
+	if err != nil {
+		t.Fatalf("execute failed: %v", err)
+	}
+
+	if core.x[11] != 0xF {
+		t.Errorf("Expected x11 to be 0xF, got %X", core.x[11])
+	}
+	if core.csrs[csrAddr] != 0xD { // 0xF &^ 0x2
+		t.Errorf("Expected CSR 0x342 to be 0xD, got %X", core.csrs[csrAddr])
+	}
+}
+
+func TestCsrrsi(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	csrAddr := uint32(csrMstatus)
+	core.csrs[csrAddr] = 0x1
+
+	instr := iTypeInstruction{
+		rd:  2,
+		rs1: 0x8, // uimm to set
+		imm: int32(csrAddr),
+	}
+
+	err := csrrsi(core, instr)
+	if err != nil {
+		t.Fatalf("csrrsi failed: %v", err)
+	}
+
+	if core.x[2] != 0x1 {
+		t.Errorf("Expected x2 to be 0x1, got %X", core.x[2])
+	}
+	if core.csrs[csrAddr] != 0x9 { // 0x1 | 0x8
+		t.Errorf("Expected CSR 0x300 to be 0x9, got %X", core.csrs[csrAddr])
+	}
+}
+
+func TestExecute_Csrrsi(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	csrAddr := uint32(csrMcause)
+	core.csrs[csrAddr] = 0x5
+
+	// CSRRSI x11, mcause, 0x1A
+	// opcode: 1110011 (73)
+	// rd: 11 (0x0B)
+	// funct3: 110 (6)
+	// uimm: 11010 (0x1A)
+	// csr: 0x342
+	// 0x342 1A 6 0B 73 -> 0x342D65F3
+	instruction := uint32(0x342D65F3)
+
+	err := execute(core, instruction)
+	if err != nil {
+		t.Fatalf("execute failed: %v", err)
+	}
+
+	if core.x[11] != 0x5 {
+		t.Errorf("Expected x11 to be 0x5, got %X", core.x[11])
+	}
+	if core.csrs[csrAddr] != 0x1F { // 0x5 | 0x1A
+		t.Errorf("Expected CSR 0x342 to be 0x1F, got %X", core.csrs[csrAddr])
+	}
+}
+
+func TestCsrrci(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	csrAddr := uint32(csrMstatus)
+	core.csrs[csrAddr] = 0xF
+
+	instr := iTypeInstruction{
+		rd:  2,
+		rs1: 0x8, // uimm to clear
+		imm: int32(csrAddr),
+	}
+
+	err := csrrci(core, instr)
+	if err != nil {
+		t.Fatalf("csrrci failed: %v", err)
+	}
+
+	if core.x[2] != 0xF {
+		t.Errorf("Expected x2 to be 0xF, got %X", core.x[2])
+	}
+	if core.csrs[csrAddr] != 0x7 { // 0xF &^ 0x8
+		t.Errorf("Expected CSR 0x300 to be 0x7, got %X", core.csrs[csrAddr])
+	}
+}
+
+func TestExecute_Csrrci(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	csrAddr := uint32(csrMcause)
+	core.csrs[csrAddr] = 0xF
+
+	// CSRRCI x11, mcause, 0x1A
+	// opcode: 1110011 (73)
+	// rd: 11 (0x0B)
+	// funct3: 111 (7)
+	// uimm: 11010 (0x1A)
+	// csr: 0x342
+	// 0x342 1A 7 0B 73 -> 0x342D75F3
+	instruction := uint32(0x342D75F3)
+
+	err := execute(core, instruction)
+	if err != nil {
+		t.Fatalf("execute failed: %v", err)
+	}
+
+	if core.x[11] != 0xF {
+		t.Errorf("Expected x11 to be 0xF, got %X", core.x[11])
+	}
+	if core.csrs[csrAddr] != 0x5 { // 0xF &^ 0x1A = 0xF & 0xFFFFFFE5 = 0x5
+		t.Errorf("Expected CSR 0x342 to be 0x5, got %X", core.csrs[csrAddr])
+	}
+}
+
 func TestParseIType(t *testing.T) {
 	instruction := uint32(0x04800713) // Example instruction
 	parsed := parseIType(instruction)

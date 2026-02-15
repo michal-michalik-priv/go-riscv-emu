@@ -61,7 +61,10 @@ const (
 	iTypeFunc3FenceI   = 0b001
 	iTypeFunc3Csrrw    = 0b001
 	iTypeFunc3Csrrs    = 0b010
+	iTypeFunc3Csrrc    = 0b011
 	iTypeFunc3Csrrwi   = 0b101
+	iTypeFunc3Csrrsi   = 0b110
+	iTypeFunc3Csrrci   = 0b111
 )
 
 // RV32I Privileged instruction immediate selectors
@@ -777,6 +780,74 @@ func csrrs(core *Core, instr iTypeInstruction) error {
 	return nil
 }
 
+// csrrc executes the CSRRC instruction on the given core.
+func csrrc(core *Core, instr iTypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing CSRRC instruction: %+v\n", instr))
+	csrAddr := uint32(instr.imm) & 0xFFF // 12-bit CSR address
+
+	// Read current CSR value
+	oldValue := core.csrs[csrAddr]
+
+	// Write old value to destination register
+	if instr.rd != 0 {
+		core.SetRegister(int(instr.rd), oldValue)
+	}
+
+	// If rs1 is not x0, clear bits in CSR
+	if instr.rs1 != 0 {
+		core.csrs[csrAddr] = oldValue &^ core.GetRegister(int(instr.rs1))
+	}
+
+	core.pc += 4
+	return nil
+}
+
+// csrrsi executes the CSRRSI instruction on the given core.
+func csrrsi(core *Core, instr iTypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing CSRRSI instruction: %+v\n", instr))
+	csrAddr := uint32(instr.imm) & 0xFFF // 12-bit CSR address
+	uimm := uint32(instr.rs1)
+
+	// Read current CSR value
+	oldValue := core.csrs[csrAddr]
+
+	// Write old value to destination register
+	if instr.rd != 0 {
+		core.SetRegister(int(instr.rd), oldValue)
+	}
+
+	// If uimm is not 0, set bits in CSR
+	if uimm != 0 {
+		core.csrs[csrAddr] = oldValue | uimm
+	}
+
+	core.pc += 4
+	return nil
+}
+
+// csrrci executes the CSRRCI instruction on the given core.
+func csrrci(core *Core, instr iTypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing CSRRCI instruction: %+v\n", instr))
+	csrAddr := uint32(instr.imm) & 0xFFF // 12-bit CSR address
+	uimm := uint32(instr.rs1)
+
+	// Read current CSR value
+	oldValue := core.csrs[csrAddr]
+
+	// Write old value to destination register
+	if instr.rd != 0 {
+		core.SetRegister(int(instr.rd), oldValue)
+	}
+
+	// If uimm is not 0, clear bits in CSR
+	if uimm != 0 {
+		core.csrs[csrAddr] = oldValue &^ uimm
+	}
+
+	core.pc += 4
+	return nil
+}
+
 // Parse parses a 32-bit instruction word and returns the corresponding
 // instruction struct based on the opcode and funct3 fields.
 func execute(core *Core, instruction uint32) error {
@@ -917,8 +988,14 @@ func execute(core *Core, instruction uint32) error {
 		return csrrw(core, parseIType(instruction))
 	case opcode == opcodeSystem && func3 == iTypeFunc3Csrrwi:
 		return csrrwi(core, parseIType(instruction))
+	case opcode == opcodeSystem && func3 == iTypeFunc3Csrrsi:
+		return csrrsi(core, parseIType(instruction))
+	case opcode == opcodeSystem && func3 == iTypeFunc3Csrrci:
+		return csrrci(core, parseIType(instruction))
 	case opcode == opcodeSystem && func3 == iTypeFunc3Csrrs:
 		return csrrs(core, parseIType(instruction))
+	case opcode == opcodeSystem && func3 == iTypeFunc3Csrrc:
+		return csrrc(core, parseIType(instruction))
 
 	default:
 		return fmt.Errorf("unsupported instruction, %032b", instruction)
