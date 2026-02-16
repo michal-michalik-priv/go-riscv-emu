@@ -1365,6 +1365,143 @@ func TestExecute_Beq(t *testing.T) {
 	}
 }
 
+func TestLRSC(t *testing.T) {
+	bus := &devices.Bus{}
+	ram := &devices.RAMDevice{}
+	ram.Initialize(0x1000, 0x100)
+	bus.AddDevice(ram)
+	core := NewCore(bus)
+
+	// Set some initial value in memory
+	ram.Write(0x1000, 0x11)
+	ram.Write(0x1001, 0x22)
+	ram.Write(0x1002, 0x33)
+	ram.Write(0x1003, 0x44)
+
+	core.x[1] = 0x1000 // rs1 = 0x1000
+
+	// Test LR.W
+	instrLR := rTypeInstruction{
+		rd:  2,
+		rs1: 1,
+	}
+	err := lr_w(core, instrLR)
+	if err != nil {
+		t.Fatalf("LR.W failed: %v", err)
+	}
+
+	if core.x[2] != 0x44332211 {
+		t.Errorf("Expected x2 to be 0x44332211, got %08X", core.x[2])
+	}
+	if !core.loadReservationValid {
+		t.Error("Expected reservation to be valid")
+	}
+	if core.loadReservationAddr != 0x1000 {
+		t.Errorf("Expected reservation address to be 0x1000, got %08X", core.loadReservationAddr)
+	}
+
+	// Test SC.W Success
+	core.x[3] = 0xDEADBEEF // rs2
+	instrSC := rTypeInstruction{
+		rd:  4,
+		rs1: 1,
+		rs2: 3,
+	}
+	err = sc_w(core, instrSC)
+	if err != nil {
+		t.Fatalf("SC.W failed: %v", err)
+	}
+	if core.x[4] != 0 {
+		t.Errorf("Expected SC.W success (x4=0), got %d", core.x[4])
+	}
+
+	// Verify memory updated
+	val, _ := ram.Read(0x1000)
+	if val != 0xEF {
+		t.Errorf("Expected 0xEF, got %02X", val)
+	}
+
+	// Test SC.W Failure (reservation invalid)
+	core.x[3] = 0xCAFEBABE
+	err = sc_w(core, instrSC)
+	if err != nil {
+		t.Fatalf("SC.W failed: %v", err)
+	}
+	if core.x[4] == 0 {
+		t.Error("Expected SC.W failure (x4 != 0)")
+	}
+}
+
+func TestAMO(t *testing.T) {
+	bus := &devices.Bus{}
+	ram := &devices.RAMDevice{}
+	ram.Initialize(0x1000, 0x100)
+	bus.AddDevice(ram)
+	core := NewCore(bus)
+
+	// Memory at 0x1000 = 10
+	ram.Write(0x1000, 10)
+	ram.Write(0x1001, 0)
+	ram.Write(0x1002, 0)
+	ram.Write(0x1003, 0)
+
+	core.x[1] = 0x1000 // address
+	core.x[2] = 5      // value
+
+	// AMOADD.W x3, x2, (x1)
+	instr := rTypeInstruction{
+		rd:    3,
+		rs1:   1,
+		rs2:   2,
+		func7: amoFunc5Add << 2,
+	}
+
+	err := amo(core, instr)
+	if err != nil {
+		t.Fatalf("AMOADD failed: %v", err)
+	}
+
+	if core.x[3] != 10 {
+		t.Errorf("Expected old value 10, got %d", core.x[3])
+	}
+
+	// Check new value in memory
+	val := uint32(0)
+	for i := uint32(0); i < 4; i++ {
+		b, _ := ram.Read(0x1000 + i)
+		val |= uint32(b) << (i * 8)
+	}
+	if val != 15 {
+		t.Errorf("Expected memory to be 15, got %d", val)
+	}
+
+	// Test AMOMAX
+	core.x[2] = 20
+	instr.func7 = amoFunc5Max << 2
+	amo(core, instr)
+	// old was 15, rs2 is 20, max is 20. memory should be 20, rd should be 15.
+	if core.x[3] != 15 {
+		t.Errorf("Expected 15, got %d", core.x[3])
+	}
+
+	// Test AMOMIN
+	core.x[2] = 5
+	instr.func7 = amoFunc5Min << 2
+	amo(core, instr)
+	// old was 20, rs2 is 5, min is 5. memory should be 5, rd should be 20.
+	if core.x[3] != 20 {
+		t.Errorf("Expected 20, got %d", core.x[3])
+	}
+
+	// Test AMOSWAP
+	core.x[2] = 100
+	instr.func7 = amoFunc5Swap << 2
+	amo(core, instr)
+	if core.x[3] != 5 {
+		t.Errorf("Expected 5, got %d", core.x[3])
+	}
+}
+
 func TestSrai(t *testing.T) {
 	core := NewCore(&devices.Bus{})
 	core.x[1] = 0x80000000 // Set register x1 to -2147483648

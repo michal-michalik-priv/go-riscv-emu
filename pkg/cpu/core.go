@@ -21,6 +21,9 @@ type Core struct {
 	csrs [4096]uint32
 	bus  *devices.Bus
 	mode uint32
+
+	loadReservationAddr  uint32
+	loadReservationValid bool
 }
 
 // NewCore creates and initializes a new CPU core with the given bus.
@@ -31,15 +34,19 @@ func NewCore(bus *devices.Bus) *Core {
 		x:    [32]uint32{},
 		csrs: [4096]uint32{},
 		mode: ModeMachine,
+
+		loadReservationAddr:  0,
+		loadReservationValid: false,
 	}
 
-	// Initialize MISA: RV32IMSU
+	// Initialize MISA: RV32IMASU
 	// Bits 31:30 = 1 (RV32)
+	// Bit 0 = A (Atomic Extension)
 	// Bit 8 = I (Base Integer)
 	// Bit 12 = M (Multiply/Divide)
 	// Bit 18 = S (Supervisor Mode)
 	// Bit 20 = U (User Mode)
-	core.csrs[csrMisa] = (1 << 30) | (1 << 8) | (1 << 12) | (1 << 18) | (1 << 20)
+	core.csrs[csrMisa] = (1 << 30) | (1 << 0) | (1 << 8) | (1 << 12) | (1 << 18) | (1 << 20)
 
 	return core
 }

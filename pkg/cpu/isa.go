@@ -22,6 +22,7 @@ const (
 	opcodeOp      = 0b0110011
 	opcodeMiscMem = 0b0001111
 	opcodeSystem  = 0b1110011
+	opcodeAtomic  = 0b0101111
 )
 
 // RV32I Funct3 for all instructions
@@ -65,6 +66,7 @@ const (
 	rTypeFunc3Divu     = 0b101
 	rTypeFunc3Rem      = 0b110
 	rTypeFunc3Remu     = 0b111
+	rTypeFunc3AtomicW  = 0b010
 	iTypeFunc3Fence    = 0b000
 	iTypeFunc3FenceI   = 0b001
 	iTypeFunc3Csrrw    = 0b001
@@ -95,6 +97,21 @@ const (
 	rTypeFunc7Or   = 0b0000000
 	rTypeFunc7And  = 0b0000000
 	rTypeFunc7M    = 0b0000001
+)
+
+// RV32A Funct5 for Atomic instructions (top 5 bits of funct7)
+const (
+	amoFunc5Add  = 0b00000
+	amoFunc5Swap = 0b00001
+	amoFunc5Lr   = 0b00010
+	amoFunc5Sc   = 0b00011
+	amoFunc5Xor  = 0b00100
+	amoFunc5Or   = 0b01000
+	amoFunc5And  = 0b01100
+	amoFunc5Min  = 0b10000
+	amoFunc5Max  = 0b10100
+	amoFunc5Minu = 0b11000
+	amoFunc5Maxu = 0b11100
 )
 
 // RISC-V Special instruction encodings
@@ -1041,6 +1058,120 @@ func remu(core *Core, instr rTypeInstruction) error {
 	return nil
 }
 
+// lr_w executes the LR.W instruction on the given core.
+func lr_w(core *Core, instr rTypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing LR.W instruction: %+v\n", instr))
+	address := core.GetRegister(int(instr.rs1))
+
+	var value uint32
+	for i := uint32(0); i < 4; i++ {
+		b, err := core.bus.Read(address + i)
+		if err != nil {
+			return fmt.Errorf("LR.W failed at offset %d: %v", i, err)
+		}
+		value |= uint32(b) << (i * 8)
+	}
+
+	core.loadReservationAddr = address
+	core.loadReservationValid = true
+
+	core.SetRegister(int(instr.rd), value)
+	core.pc += 4
+	return nil
+}
+
+// sc_w executes the SC.W instruction on the given core.
+func sc_w(core *Core, instr rTypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing SC.W instruction: %+v\n", instr))
+	address := core.GetRegister(int(instr.rs1))
+
+	if core.loadReservationValid && core.loadReservationAddr == address {
+		value := core.GetRegister(int(instr.rs2))
+		for i := uint32(0); i < 4; i++ {
+			err := core.bus.Write(address+i, byte((value>>(i*8))&0xFF))
+			if err != nil {
+				return fmt.Errorf("SC.W failed at offset %d: %v", i, err)
+			}
+		}
+		core.SetRegister(int(instr.rd), 0)
+	} else {
+		core.SetRegister(int(instr.rd), 1)
+	}
+
+	core.loadReservationValid = false
+	core.pc += 4
+	return nil
+}
+
+// amo executes the AMO instructions on the given core.
+func amo(core *Core, instr rTypeInstruction) error {
+	slog.Debug(fmt.Sprintf("Executing AMO instruction: %+v\n", instr))
+	address := core.GetRegister(int(instr.rs1))
+	funct5 := instr.func7 >> 2
+
+	var oldValue uint32
+	for i := uint32(0); i < 4; i++ {
+		b, err := core.bus.Read(address + i)
+		if err != nil {
+			return fmt.Errorf("AMO failed at offset %d: %v", i, err)
+		}
+		oldValue |= uint32(b) << (i * 8)
+	}
+
+	rs2Val := core.GetRegister(int(instr.rs2))
+	var newValue uint32
+
+	switch funct5 {
+	case amoFunc5Add:
+		newValue = oldValue + rs2Val
+	case amoFunc5Swap:
+		newValue = rs2Val
+	case amoFunc5Xor:
+		newValue = oldValue ^ rs2Val
+	case amoFunc5Or:
+		newValue = oldValue | rs2Val
+	case amoFunc5And:
+		newValue = oldValue & rs2Val
+	case amoFunc5Min:
+		if int32(oldValue) < int32(rs2Val) {
+			newValue = oldValue
+		} else {
+			newValue = rs2Val
+		}
+	case amoFunc5Max:
+		if int32(oldValue) > int32(rs2Val) {
+			newValue = oldValue
+		} else {
+			newValue = rs2Val
+		}
+	case amoFunc5Minu:
+		if oldValue < rs2Val {
+			newValue = oldValue
+		} else {
+			newValue = rs2Val
+		}
+	case amoFunc5Maxu:
+		if oldValue > rs2Val {
+			newValue = oldValue
+		} else {
+			newValue = rs2Val
+		}
+	default:
+		return fmt.Errorf("unsupported AMO operation: %05b", funct5)
+	}
+
+	for i := uint32(0); i < 4; i++ {
+		err := core.bus.Write(address+i, byte((newValue>>(i*8))&0xFF))
+		if err != nil {
+			return fmt.Errorf("AMO failed write at offset %d: %v", i, err)
+		}
+	}
+
+	core.SetRegister(int(instr.rd), oldValue)
+	core.pc += 4
+	return nil
+}
+
 // Parse parses a 32-bit instruction word and returns the corresponding
 // instruction struct based on the opcode and funct3 fields.
 func execute(core *Core, instruction uint32) error {
@@ -1175,6 +1306,17 @@ func execute(core *Core, instruction uint32) error {
 			return divu(core, instr)
 		}
 		return fmt.Errorf("unsupported R-type instruction, %032b", instruction)
+	case opcode == opcodeAtomic && func3 == rTypeFunc3AtomicW:
+		instr := parseRType(instruction)
+		funct5 := instr.func7 >> 2
+		switch funct5 {
+		case amoFunc5Lr:
+			return lr_w(core, instr)
+		case amoFunc5Sc:
+			return sc_w(core, instr)
+		default:
+			return amo(core, instr)
+		}
 	case opcode == opcodeMiscMem && func3 == iTypeFunc3Fence:
 		return fence(core, parseIType(instruction))
 	case opcode == opcodeMiscMem && func3 == iTypeFunc3FenceI:
