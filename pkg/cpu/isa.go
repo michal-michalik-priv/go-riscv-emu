@@ -97,14 +97,6 @@ const (
 	rTypeFunc7M    = 0b0000001
 )
 
-// RISC-V CSR addresses
-const (
-	csrSepc    = 0x141
-	csrMstatus = 0x300
-	csrMepc    = 0x341
-	csrMcause  = 0x342
-)
-
 // RISC-V Special instruction encodings
 const (
 	instrUnimp0      = 0x00000000
@@ -525,7 +517,6 @@ func lh(core *Core, instr iTypeInstruction) error {
 }
 
 // lbu executes the LBU instruction on the given core.
-// lbu executes the LBU instruction on the given core.
 func lbu(core *Core, instr iTypeInstruction) error {
 	slog.Debug(fmt.Sprintf("Executing LBU instruction: %+v\n", instr))
 	address := core.GetRegister(int(instr.rs1)) + uint32(instr.imm)
@@ -699,14 +690,21 @@ func csrrw(core *Core, instr iTypeInstruction) error {
 	slog.Debug(fmt.Sprintf("Executing CSRRW instruction: %+v\n", instr))
 	csrAddr := uint32(instr.imm) & 0xFFF // 12-bit CSR address
 
-	// If rd is not x0, read current CSR value and write it to rd
-	if instr.rd != 0 {
-		oldValue := core.csrs[csrAddr]
-		core.SetRegister(int(instr.rd), oldValue)
+	oldValue, err := core.ReadCSR(csrAddr)
+	if err != nil {
+		core.Trap(ExceptionIllegalInstruction, 0)
+		return nil
 	}
 
-	// Write value from rs1 to CSR
-	core.csrs[csrAddr] = core.GetRegister(int(instr.rs1))
+	err = core.WriteCSR(csrAddr, core.GetRegister(int(instr.rs1)))
+	if err != nil {
+		core.Trap(ExceptionIllegalInstruction, 0)
+		return nil
+	}
+
+	if instr.rd != 0 {
+		core.SetRegister(int(instr.rd), oldValue)
+	}
 
 	core.pc += 4
 	return nil
@@ -718,14 +716,21 @@ func csrrwi(core *Core, instr iTypeInstruction) error {
 	csrAddr := uint32(instr.imm) & 0xFFF // 12-bit CSR address
 	uimm := uint32(instr.rs1)
 
-	// If rd is not x0, read current CSR value and write it to rd
-	if instr.rd != 0 {
-		oldValue := core.csrs[csrAddr]
-		core.SetRegister(int(instr.rd), oldValue)
+	oldValue, err := core.ReadCSR(csrAddr)
+	if err != nil {
+		core.Trap(ExceptionIllegalInstruction, 0)
+		return nil
 	}
 
-	// Write zero-extended 5-bit immediate to CSR
-	core.csrs[csrAddr] = uimm
+	err = core.WriteCSR(csrAddr, uimm)
+	if err != nil {
+		core.Trap(ExceptionIllegalInstruction, 0)
+		return nil
+	}
+
+	if instr.rd != 0 {
+		core.SetRegister(int(instr.rd), oldValue)
+	}
 
 	core.pc += 4
 	return nil
@@ -734,6 +739,26 @@ func csrrwi(core *Core, instr iTypeInstruction) error {
 // mret executes the MRET instruction on the given core.
 func mret(core *Core) error {
 	slog.Debug("Executing MRET instruction")
+	if core.mode != ModeMachine {
+		core.Trap(ExceptionIllegalInstruction, 0)
+		return nil
+	}
+
+	// Restore mode: MPP
+	mstatus := core.csrs[csrMstatus]
+	core.mode = (mstatus & mstatusMPP) >> 11
+
+	// Restore interrupt enable: MIE = MPIE
+	if (mstatus & mstatusMPIE) != 0 {
+		core.csrs[csrMstatus] |= mstatusMIE
+	} else {
+		core.csrs[csrMstatus] &^= mstatusMIE
+	}
+
+	// MPIE = 1, MPP = User
+	core.csrs[csrMstatus] |= mstatusMPIE
+	core.csrs[csrMstatus] &^= mstatusMPP
+
 	core.pc = core.csrs[csrMepc]
 	return nil
 }
@@ -741,6 +766,30 @@ func mret(core *Core) error {
 // sret executes the SRET instruction on the given core.
 func sret(core *Core) error {
 	slog.Debug("Executing SRET instruction")
+	if core.mode < ModeSupervisor {
+		core.Trap(ExceptionIllegalInstruction, 0)
+		return nil
+	}
+
+	// Restore mode: SPP
+	mstatus := core.csrs[csrMstatus]
+	if (mstatus & mstatusSPP) != 0 {
+		core.mode = ModeSupervisor
+	} else {
+		core.mode = ModeUser
+	}
+
+	// Restore interrupt enable: SIE = SPIE
+	if (mstatus & mstatusSPIE) != 0 {
+		core.csrs[csrMstatus] |= mstatusSIE
+	} else {
+		core.csrs[csrMstatus] &^= mstatusSIE
+	}
+
+	// SPIE = 1, SPP = User
+	core.csrs[csrMstatus] |= mstatusSPIE
+	core.csrs[csrMstatus] &^= mstatusSPP
+
 	core.pc = core.csrs[csrSepc]
 	return nil
 }
@@ -748,6 +797,8 @@ func sret(core *Core) error {
 // ecall executes the ECALL instruction on the given core.
 func ecall(core *Core) error {
 	slog.Debug("Executing ECALL instruction")
+
+	// Check if this is a test exit (riscv-tests convention)
 	a10 := core.GetRegister(10)
 	a17 := core.GetRegister(17)
 	sysc := uint32(93)
@@ -758,13 +809,26 @@ func ecall(core *Core) error {
 		slog.Info(fmt.Sprintf("TESTS FAILED (no. %+v)", a10))
 		os.Exit(1)
 	}
-	return fmt.Errorf("ECALL triggered")
+
+	cause := uint32(0)
+	switch core.mode {
+	case ModeUser:
+		cause = ExceptionEnvironmentCallFromUMode
+	case ModeSupervisor:
+		cause = ExceptionEnvironmentCallFromSMode
+	case ModeMachine:
+		cause = ExceptionEnvironmentCallFromMMode
+	}
+
+	core.Trap(cause, 0)
+	return nil
 }
 
 // unimp executes the UNIMP pseudo-instruction on the given core.
 func unimp(core *Core, instruction uint32) error {
 	slog.Debug(fmt.Sprintf("Executing UNIMP instruction: %08X", instruction))
-	return fmt.Errorf("UNIMP instruction encountered")
+	core.Trap(ExceptionIllegalInstruction, instruction)
+	return nil
 }
 
 // csrrs executes the CSRRS instruction on the given core.
@@ -772,17 +836,22 @@ func csrrs(core *Core, instr iTypeInstruction) error {
 	slog.Debug(fmt.Sprintf("Executing CSRRS instruction: %+v\n", instr))
 	csrAddr := uint32(instr.imm) & 0xFFF // 12-bit CSR address
 
-	// Read current CSR value
-	oldValue := core.csrs[csrAddr]
-
-	// Write old value to destination register
-	if instr.rd != 0 {
-		core.SetRegister(int(instr.rd), oldValue)
+	oldValue, err := core.ReadCSR(csrAddr)
+	if err != nil {
+		core.Trap(ExceptionIllegalInstruction, 0)
+		return nil
 	}
 
-	// If rs1 is not x0, set bits in CSR
 	if instr.rs1 != 0 {
-		core.csrs[csrAddr] = oldValue | core.GetRegister(int(instr.rs1))
+		err = core.WriteCSR(csrAddr, oldValue|core.GetRegister(int(instr.rs1)))
+		if err != nil {
+			core.Trap(ExceptionIllegalInstruction, 0)
+			return nil
+		}
+	}
+
+	if instr.rd != 0 {
+		core.SetRegister(int(instr.rd), oldValue)
 	}
 
 	core.pc += 4
@@ -794,17 +863,22 @@ func csrrc(core *Core, instr iTypeInstruction) error {
 	slog.Debug(fmt.Sprintf("Executing CSRRC instruction: %+v\n", instr))
 	csrAddr := uint32(instr.imm) & 0xFFF // 12-bit CSR address
 
-	// Read current CSR value
-	oldValue := core.csrs[csrAddr]
-
-	// Write old value to destination register
-	if instr.rd != 0 {
-		core.SetRegister(int(instr.rd), oldValue)
+	oldValue, err := core.ReadCSR(csrAddr)
+	if err != nil {
+		core.Trap(ExceptionIllegalInstruction, 0)
+		return nil
 	}
 
-	// If rs1 is not x0, clear bits in CSR
 	if instr.rs1 != 0 {
-		core.csrs[csrAddr] = oldValue &^ core.GetRegister(int(instr.rs1))
+		err = core.WriteCSR(csrAddr, oldValue&^core.GetRegister(int(instr.rs1)))
+		if err != nil {
+			core.Trap(ExceptionIllegalInstruction, 0)
+			return nil
+		}
+	}
+
+	if instr.rd != 0 {
+		core.SetRegister(int(instr.rd), oldValue)
 	}
 
 	core.pc += 4
@@ -817,17 +891,22 @@ func csrrsi(core *Core, instr iTypeInstruction) error {
 	csrAddr := uint32(instr.imm) & 0xFFF // 12-bit CSR address
 	uimm := uint32(instr.rs1)
 
-	// Read current CSR value
-	oldValue := core.csrs[csrAddr]
-
-	// Write old value to destination register
-	if instr.rd != 0 {
-		core.SetRegister(int(instr.rd), oldValue)
+	oldValue, err := core.ReadCSR(csrAddr)
+	if err != nil {
+		core.Trap(ExceptionIllegalInstruction, 0)
+		return nil
 	}
 
-	// If uimm is not 0, set bits in CSR
 	if uimm != 0 {
-		core.csrs[csrAddr] = oldValue | uimm
+		err = core.WriteCSR(csrAddr, oldValue|uimm)
+		if err != nil {
+			core.Trap(ExceptionIllegalInstruction, 0)
+			return nil
+		}
+	}
+
+	if instr.rd != 0 {
+		core.SetRegister(int(instr.rd), oldValue)
 	}
 
 	core.pc += 4
@@ -840,17 +919,22 @@ func csrrci(core *Core, instr iTypeInstruction) error {
 	csrAddr := uint32(instr.imm) & 0xFFF // 12-bit CSR address
 	uimm := uint32(instr.rs1)
 
-	// Read current CSR value
-	oldValue := core.csrs[csrAddr]
-
-	// Write old value to destination register
-	if instr.rd != 0 {
-		core.SetRegister(int(instr.rd), oldValue)
+	oldValue, err := core.ReadCSR(csrAddr)
+	if err != nil {
+		core.Trap(ExceptionIllegalInstruction, 0)
+		return nil
 	}
 
-	// If uimm is not 0, clear bits in CSR
 	if uimm != 0 {
-		core.csrs[csrAddr] = oldValue &^ uimm
+		err = core.WriteCSR(csrAddr, oldValue&^uimm)
+		if err != nil {
+			core.Trap(ExceptionIllegalInstruction, 0)
+			return nil
+		}
+	}
+
+	if instr.rd != 0 {
+		core.SetRegister(int(instr.rd), oldValue)
 	}
 
 	core.pc += 4
@@ -1129,6 +1213,7 @@ func execute(core *Core, instruction uint32) error {
 
 // Step fetches and executes the next instruction for the given core.
 func Step(core *Core) error {
+	core.CheckInterrupts()
 	instruction := core.Fetch()
 	err := execute(core, instruction)
 	if err != nil {

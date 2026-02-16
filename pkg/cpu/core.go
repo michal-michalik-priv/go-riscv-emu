@@ -7,22 +7,41 @@ import (
 	"github.com/michal-michalik-priv/go-riscv-emu/pkg/devices"
 )
 
+// Privilege modes
+const (
+	ModeUser       uint32 = 0
+	ModeSupervisor uint32 = 1
+	ModeMachine    uint32 = 3
+)
+
 // Core represents the CPU core with its registers and program counter.
 type Core struct {
 	pc   uint32
 	x    [32]uint32
 	csrs [4096]uint32
 	bus  *devices.Bus
+	mode uint32
 }
 
 // NewCore creates and initializes a new CPU core with the given bus.
 func NewCore(bus *devices.Bus) *Core {
-	return &Core{
+	core := &Core{
 		pc:   0,
 		bus:  bus,
 		x:    [32]uint32{},
 		csrs: [4096]uint32{},
+		mode: ModeMachine,
 	}
+
+	// Initialize MISA: RV32IMSU
+	// Bits 31:30 = 1 (RV32)
+	// Bit 8 = I (Base Integer)
+	// Bit 12 = M (Multiply/Divide)
+	// Bit 18 = S (Supervisor Mode)
+	// Bit 20 = U (User Mode)
+	core.csrs[csrMisa] = (1 << 30) | (1 << 8) | (1 << 12) | (1 << 18) | (1 << 20)
+
+	return core
 }
 
 // SetPc sets the program counter to the specified value.

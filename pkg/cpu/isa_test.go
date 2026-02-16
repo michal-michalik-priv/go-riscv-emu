@@ -1585,40 +1585,54 @@ func TestExecute_Sret(t *testing.T) {
 
 func TestExecute_Ecall(t *testing.T) {
 	core := NewCore(&devices.Bus{})
+	// Set a17 to something other than 93 to avoid test exit logic
+	core.SetRegister(17, 1)
+	core.pc = 0x1000
 
 	// ECALL -> 0x00000073
 	instruction := uint32(0x00000073)
 	err := execute(core, instruction)
-	if err == nil {
-		t.Fatal("Expected error from ECALL, got nil")
+	if err != nil {
+		t.Fatalf("execute failed: %v", err)
 	}
 
-	if err.Error() != "ECALL triggered" {
-		t.Errorf("Expected 'ECALL triggered' error, got %v", err)
+	if core.csrs[csrMcause] != ExceptionEnvironmentCallFromMMode {
+		t.Errorf("Expected mcause to be %d, got %d", ExceptionEnvironmentCallFromMMode, core.csrs[csrMcause])
+	}
+	if core.csrs[csrMepc] != 0x1000 {
+		t.Errorf("Expected mepc to be 0x1000, got %X", core.csrs[csrMepc])
 	}
 }
 
 func TestExecute_Unimp(t *testing.T) {
 	core := NewCore(&devices.Bus{})
+	core.pc = 0x1000
 
 	// UNIMP (0x00000000)
 	instruction := uint32(0x00000000)
 	err := execute(core, instruction)
-	if err == nil {
-		t.Fatal("Expected error from UNIMP (0x00000000), got nil")
+	if err != nil {
+		t.Fatalf("execute failed: %v", err)
 	}
-	if !strings.Contains(err.Error(), "UNIMP instruction encountered") {
-		t.Errorf("Unexpected error message: %v", err)
+	if core.csrs[csrMcause] != ExceptionIllegalInstruction {
+		t.Errorf("Expected mcause to be %d, got %d", ExceptionIllegalInstruction, core.csrs[csrMcause])
+	}
+	if core.csrs[csrMepc] != 0x1000 {
+		t.Errorf("Expected mepc to be 0x1000, got %X", core.csrs[csrMepc])
 	}
 
 	// UNIMP (0xC0001073)
 	instruction = uint32(0xC0001073)
+	core.pc = 0x2000
 	err = execute(core, instruction)
-	if err == nil {
-		t.Fatal("Expected error from UNIMP (0xC0001073), got nil")
+	if err != nil {
+		t.Fatalf("execute failed: %v", err)
 	}
-	if !strings.Contains(err.Error(), "UNIMP instruction encountered") {
-		t.Errorf("Unexpected error message: %v", err)
+	if core.csrs[csrMcause] != ExceptionIllegalInstruction {
+		t.Errorf("Expected mcause to be %d, got %d", ExceptionIllegalInstruction, core.csrs[csrMcause])
+	}
+	if core.csrs[csrMepc] != 0x2000 {
+		t.Errorf("Expected mepc to be 0x2000, got %X", core.csrs[csrMepc])
 	}
 }
 
