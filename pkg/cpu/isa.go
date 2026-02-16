@@ -79,9 +79,10 @@ const (
 
 // RV32I Privileged instruction immediate selectors
 const (
-	privImmEcall = 0x000
-	privImmSret  = 0x102
-	privImmMret  = 0x302
+	privImmEcall  = 0x000
+	privImmEbreak = 0x001
+	privImmSret   = 0x102
+	privImmMret   = 0x302
 )
 
 // RV32I Funct7 for all instructions
@@ -811,6 +812,13 @@ func sret(core *Core) error {
 	return nil
 }
 
+// ebreak executes the EBREAK instruction on the given core.
+func ebreak(core *Core) error {
+	slog.Debug("Executing EBREAK instruction")
+	core.Trap(ExceptionBreakpoint, 0)
+	return nil
+}
+
 // ecall executes the ECALL instruction on the given core.
 func ecall(core *Core) error {
 	slog.Debug("Executing ECALL instruction")
@@ -1326,6 +1334,8 @@ func execute(core *Core, instruction uint32) error {
 		switch instr.imm {
 		case privImmEcall:
 			return ecall(core)
+		case privImmEbreak:
+			return ebreak(core)
 		case privImmMret:
 			return mret(core)
 		case privImmSret:
