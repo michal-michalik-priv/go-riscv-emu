@@ -4,9 +4,33 @@ import (
 	"debug/elf"
 	"fmt"
 	"log/slog"
+	"os"
 
 	"github.com/michal-michalik-priv/go-riscv-emu/pkg/system"
 )
+
+// LoadBinaryToSystem loads a raw binary file from the specified file path into
+// the provided system at the specified address. It sets the CPU's program
+// counter to the load address.
+func LoadBinaryToSystem(filePath string, loadAddr uint32, sys *system.System) error {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("error reading binary file: %v", err)
+	}
+
+	slog.Debug(fmt.Sprintf("Loading binary at 0x%X (size: %d)\n", loadAddr, len(data)))
+
+	for i, b := range data {
+		err := sys.Bus().Write(loadAddr+uint32(i), b)
+		if err != nil {
+			return fmt.Errorf("error writing to device at address 0X%X: %v", loadAddr+uint32(i), err)
+		}
+	}
+
+	sys.Core().SetPc(loadAddr)
+
+	return nil
+}
 
 // LoadELFToSystem loads an ELF file from the specified file path into the
 // provided system. It maps the ELF segments into the system's memory-mapped
