@@ -11,6 +11,7 @@ const (
 	// RAMOffset is the starting address of the RAM in the system's memory map.
 	RAMOffset      = 0x80000000
 	DummyTTYOffset = 0x10000000
+	TimerOffset    = 0x02000000
 )
 
 // System represents the entire emulation system, including the CPU and memory.
@@ -36,6 +37,12 @@ func NewSystem(dummy_tty bool) *System {
 		core: cpu.NewCore(&bus),
 		bus:  bus,
 	}
+
+	timerDevice := &devices.TimerDevice{}
+	timerDevice.Initialize(TimerOffset, 0x10000)
+	timerDevice.SetInterruptHandler(system.core.SetInterrupt)
+	timerDevice.Start()
+	bus.AddDevice(timerDevice)
 
 	return &system
 }

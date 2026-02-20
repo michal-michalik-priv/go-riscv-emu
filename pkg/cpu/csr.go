@@ -43,6 +43,7 @@ const (
 	mstatusMPIE = 1 << 7
 	mstatusSPP  = 1 << 8
 	mstatusMPP  = 3 << 11
+	mstatusTW   = 1 << 21
 )
 
 // CanAccessCSR checks if the current mode has access to the given CSR address.

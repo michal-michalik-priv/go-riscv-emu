@@ -83,6 +83,7 @@ const (
 	privImmEbreak = 0x001
 	privImmSret   = 0x102
 	privImmMret   = 0x302
+	privImmWfi    = 0x105
 )
 
 // RV32I Funct7 for all instructions
@@ -481,6 +482,18 @@ func sw(core *Core, instr sTypeInstruction) error {
 	address := core.GetRegister(int(instr.rs1)) + uint32(instr.imm)
 	value := core.GetRegister(int(instr.rs2))
 
+	// Check for tohost write (test termination)
+	// 0x80001000 is the standard tohost address for riscv-tests
+	if address == 0x80001000 {
+		if value == 1 {
+			slog.Info("TESTS PASSED")
+			os.Exit(0)
+		} else {
+			slog.Info(fmt.Sprintf("TESTS FAILED (no. %d)", value>>1))
+			os.Exit(1)
+		}
+	}
+
 	for i := uint32(0); i < 4; i++ {
 		err := core.bus.Write(address+i, byte((value>>(i*8))&0xFF))
 		if err != nil {
@@ -816,6 +829,29 @@ func sret(core *Core) error {
 func ebreak(core *Core) error {
 	slog.Debug("Executing EBREAK instruction")
 	core.Trap(ExceptionBreakpoint, 0)
+	return nil
+}
+
+// wfi executes the WFI instruction on the given core.
+func wfi(core *Core) error {
+	slog.Debug("Executing WFI instruction")
+	core.mu.Lock()
+	if core.mode == ModeUser {
+		core.mu.Unlock()
+		core.Trap(ExceptionIllegalInstruction, 0)
+		return nil
+	}
+	// Check TW bit in mstatus
+	mstatus := core.csrs[csrMstatus]
+	if core.mode == ModeSupervisor && (mstatus&mstatusTW) != 0 {
+		core.mu.Unlock()
+		core.Trap(ExceptionIllegalInstruction, 0)
+		return nil
+	}
+
+	core.pc += 4
+	core.wfi = true
+	core.mu.Unlock()
 	return nil
 }
 
@@ -1340,6 +1376,8 @@ func execute(core *Core, instruction uint32) error {
 			return mret(core)
 		case privImmSret:
 			return sret(core)
+		case privImmWfi:
+			return wfi(core)
 		default:
 			return fmt.Errorf("unsupported system instruction, %032b", instruction)
 		}
@@ -1365,7 +1403,21 @@ func execute(core *Core, instruction uint32) error {
 
 // Step fetches and executes the next instruction for the given core.
 func Step(core *Core) error {
+	core.mu.Lock()
+	if core.wfi {
+		// Wake up on any pending interrupt, even if disabled
+		if core.csrs[csrMip] != 0 {
+			core.wfi = false
+		}
+	}
+	isWfi := core.wfi
+	core.mu.Unlock()
+
 	core.CheckInterrupts()
+	if isWfi {
+		return nil
+	}
+
 	instruction := core.Fetch()
 	err := execute(core, instruction)
 	if err != nil {

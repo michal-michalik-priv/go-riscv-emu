@@ -3,6 +3,7 @@ package cpu
 import (
 	"fmt"
 	"log/slog"
+	"sync"
 
 	"github.com/michal-michalik-priv/go-riscv-emu/pkg/devices"
 )
@@ -24,6 +25,8 @@ type Core struct {
 
 	loadReservationAddr  uint32
 	loadReservationValid bool
+	wfi                  bool
+	mu                   sync.Mutex
 }
 
 // NewCore creates and initializes a new CPU core with the given bus.
@@ -37,6 +40,8 @@ func NewCore(bus *devices.Bus) *Core {
 
 		loadReservationAddr:  0,
 		loadReservationValid: false,
+		wfi:                  false,
+		mu:                   sync.Mutex{},
 	}
 
 	// Initialize MISA: RV32IMASU
@@ -89,4 +94,16 @@ func (c *Core) Fetch() uint32 {
 		(uint32(byte3) << 16) | (uint32(byte4) << 24)
 
 	return instruction
+}
+
+// SetInterrupt sets or clears an interrupt bit in the mip CSR.
+func (c *Core) SetInterrupt(bit uint32, active bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if active {
+		c.csrs[csrMip] |= bit
+	} else {
+		c.csrs[csrMip] &^= bit
+	}
 }
