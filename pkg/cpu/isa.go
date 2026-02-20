@@ -871,6 +871,10 @@ func ecall(core *Core) error {
 		os.Exit(1)
 	}
 
+	if handleSBI(core) {
+		return nil
+	}
+
 	cause := uint32(0)
 	switch core.mode {
 	case ModeUser:
