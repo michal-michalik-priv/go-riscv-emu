@@ -1419,6 +1419,7 @@ func Step(core *Core) error {
 
 	core.CheckInterrupts()
 	if isWfi {
+		core.IncrementCounters(false)
 		return nil
 	}
 
@@ -1427,5 +1428,7 @@ func Step(core *Core) error {
 	if err != nil {
 		return err
 	}
+
+	core.IncrementCounters(true)
 	return nil
 }

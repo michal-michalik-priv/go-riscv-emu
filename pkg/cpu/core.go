@@ -107,3 +107,25 @@ func (c *Core) SetInterrupt(bit uint32, active bool) {
 		c.csrs[csrMip] &^= bit
 	}
 }
+
+// IncrementCounters increments the mcycle and minstret CSRs.
+func (c *Core) IncrementCounters(retired bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	// Increment mcycle
+	oldCycle := c.csrs[csrMcycle]
+	c.csrs[csrMcycle]++
+	if c.csrs[csrMcycle] < oldCycle {
+		c.csrs[csrMcycleH]++
+	}
+
+	if retired {
+		// Increment minstret
+		oldInstret := c.csrs[csrMinstret]
+		c.csrs[csrMinstret]++
+		if c.csrs[csrMinstret] < oldInstret {
+			c.csrs[csrMinstretH]++
+		}
+	}
+}

@@ -33,6 +33,20 @@ const (
 	csrMarchid   = 0xF12
 	csrMimpid    = 0xF13
 	csrMhartid   = 0xF14
+
+	// Machine counters/timers
+	csrMcycle    = 0xB00
+	csrMinstret  = 0xB02
+	csrMcycleH   = 0xB80
+	csrMinstretH = 0xB82
+
+	// User counters/timers
+	csrCycle    = 0xC00
+	csrTime     = 0xC01
+	csrInstret  = 0xC02
+	csrCycleH   = 0xC80
+	csrTimeH    = 0xC81
+	csrInstretH = 0xC82
 )
 
 // mstatus/sstatus bit masks (simplified)
@@ -67,12 +81,38 @@ func (c *Core) ReadCSR(address uint32) (uint32, error) {
 		return 0, fmt.Errorf("CSR read access denied: %03X", address)
 	}
 
+	address = address & 0xFFF
+
 	// Some CSRs are shadows of others or have special logic
 	switch address {
 	case csrSstatus:
 		return c.csrs[csrMstatus] & 0x800DE122, nil // Simplified mask for sstatus
+	case csrCycle:
+		return c.csrs[csrMcycle], nil
+	case csrCycleH:
+		return c.csrs[csrMcycleH], nil
+	case csrInstret:
+		return c.csrs[csrMinstret], nil
+	case csrInstretH:
+		return c.csrs[csrMinstretH], nil
+	case csrTime:
+		// Shadow mtime (MMIO 0x0200BFF8)
+		val := uint32(0)
+		for i := uint32(0); i < 4; i++ {
+			b, _ := c.bus.Read(0x0200BFF8 + i)
+			val |= uint32(b) << (i * 8)
+		}
+		return val, nil
+	case csrTimeH:
+		// Shadow mtimeh (MMIO 0x0200BFFC)
+		val := uint32(0)
+		for i := uint32(0); i < 4; i++ {
+			b, _ := c.bus.Read(0x0200BFFC + i)
+			val |= uint32(b) << (i * 8)
+		}
+		return val, nil
 	default:
-		return c.csrs[address&0xFFF], nil
+		return c.csrs[address], nil
 	}
 }
 
