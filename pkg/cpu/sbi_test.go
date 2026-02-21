@@ -21,6 +21,11 @@ func TestSBIPutchar(t *testing.T) {
 	if core.pc != 0x1004 {
 		t.Errorf("Expected PC to be 0x1004, got %X", core.pc)
 	}
+
+	a0 := core.GetRegister(10)
+	if a0 != uint32(SBI_SUCCESS) {
+		t.Errorf("Expected a0 to be SBI_SUCCESS (0), got %v", a0)
+	}
 }
 
 func TestSBIWrongMode(t *testing.T) {
@@ -35,14 +40,38 @@ func TestSBIWrongMode(t *testing.T) {
 		t.Fatalf("ecall failed: %v", err)
 	}
 
-	// Should NOT have advanced PC by 4 in ecall because it should have trapped
-	// But ecall() calls core.Trap which handles PC saving and jumping to vector.
-	// In our core.Trap, it doesn't advance PC before saving it to mepc/sepc.
-	if core.pc == 0x1004 {
-		t.Errorf("PC should not have advanced for non-SBI ecall")
+	// Now it should have advanced PC because handleSBI handles it by returning error code
+	if core.pc != 0x1004 {
+		t.Errorf("Expected PC to be 0x1004, got %X", core.pc)
 	}
 
-	if core.csrs[csrMcause] != ExceptionEnvironmentCallFromUMode {
-		t.Errorf("Expected cause %d, got %d", ExceptionEnvironmentCallFromUMode, core.csrs[csrMcause])
+	a0 := core.GetRegister(10)
+	errCode := int32(SBI_ERR_NOT_SUPPORTED)
+	expectedA0 := uint32(errCode)
+	if a0 != expectedA0 {
+		t.Errorf("Expected a0 to be %X (SBI_ERR_NOT_SUPPORTED), got %X", expectedA0, a0)
+	}
+}
+
+func TestSBIUnsupported(t *testing.T) {
+	core := NewCore(&devices.Bus{})
+	core.mode = ModeSupervisor
+	core.SetRegister(17, 99) // a7 = Unsupported EID
+	core.pc = 0x1000
+
+	err := ecall(core)
+	if err != nil {
+		t.Fatalf("ecall failed: %v", err)
+	}
+
+	if core.pc != 0x1004 {
+		t.Errorf("Expected PC to be 0x1004, got %X", core.pc)
+	}
+
+	a0 := core.GetRegister(10)
+	errCode := int32(SBI_ERR_NOT_SUPPORTED)
+	expectedA0 := uint32(errCode)
+	if a0 != expectedA0 {
+		t.Errorf("Expected a0 to be %X (SBI_ERR_NOT_SUPPORTED), got %X", expectedA0, a0)
 	}
 }
