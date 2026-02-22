@@ -53,6 +53,53 @@ func TestSBIWrongMode(t *testing.T) {
 	}
 }
 
+func TestSBISetTimer(t *testing.T) {
+	bus := &devices.Bus{}
+	timer := &devices.TimerDevice{}
+	timer.Initialize(0x02000000, 0x10000)
+	bus.AddDevice(timer)
+
+	core := NewCore(bus)
+	core.mode = ModeSupervisor
+	core.SetRegister(17, 0)          // a7 = sbiSetTimer
+	core.SetRegister(10, 0x12345678) // a0 = low
+	core.SetRegister(11, 0x87654321) // a1 = high
+	core.pc = 0x1000
+
+	// Set STIP first to see if it gets cleared
+	core.SetInterrupt(1<<5, true)
+
+	err := ecall(core)
+	if err != nil {
+		t.Fatalf("ecall failed: %v", err)
+	}
+
+	if core.pc != 0x1004 {
+		t.Errorf("Expected PC to be 0x1004, got %X", core.pc)
+	}
+
+	a0 := core.GetRegister(10)
+	if a0 != uint32(SBI_SUCCESS) {
+		t.Errorf("Expected a0 to be SBI_SUCCESS (0), got %v", a0)
+	}
+
+	// Check if STIP is cleared
+	if (core.csrs[csrMip] & (1 << 5)) != 0 {
+		t.Errorf("Expected STIP to be cleared")
+	}
+
+	// Check if mtimecmp is set correctly
+	var val uint64
+	for i := uint32(0); i < 8; i++ {
+		b, _ := bus.Read(0x02004000 + i)
+		val |= uint64(b) << (i * 8)
+	}
+	expected := uint64(0x8765432112345678)
+	if val != expected {
+		t.Errorf("Expected mtimecmp to be %X, got %X", expected, val)
+	}
+}
+
 func TestSBIUnsupported(t *testing.T) {
 	core := NewCore(&devices.Bus{})
 	core.mode = ModeSupervisor
