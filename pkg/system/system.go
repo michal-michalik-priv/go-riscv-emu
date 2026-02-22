@@ -52,6 +52,11 @@ func (s *System) Core() *cpu.Core {
 	return s.core
 }
 
+// Bootloader sets up the CPU state to boot into Supervisor mode.
+func (s *System) Bootloader(entryPoint uint32) {
+	s.core.Bootloader(entryPoint)
+}
+
 // Bus returns the device bus of the system.
 func (s *System) Bus() *devices.Bus {
 	return &s.bus

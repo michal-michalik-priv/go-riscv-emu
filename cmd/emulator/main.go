@@ -16,6 +16,7 @@ func main() {
 	kernelAddr := flag.Uint("kernel-addr", 0x80000000, "Address to load the raw binary kernel at")
 	steps := flag.Int("steps", 0, "Number of steps to execute (0 for infinite, default)")
 	dummyTTY := flag.Bool("dummy-tty", false, "Enable Dummy TTY device")
+	bootloader := flag.Bool("bootloader", false, "Enable bootloader adapter to boot into S-mode")
 	flag.Parse()
 
 	if *debug {
@@ -42,6 +43,11 @@ func main() {
 		slog.Error("Failed to load executable:", "error", err)
 		return
 	}
+
+	if *bootloader {
+		system.Bootloader(uint32(*kernelAddr))
+	}
+
 	slog.Info("Emulator initialized. Starting execution...")
 
 	if *steps == 0 {

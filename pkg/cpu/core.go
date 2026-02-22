@@ -129,3 +129,20 @@ func (c *Core) IncrementCounters(retired bool) {
 		}
 	}
 }
+
+// Bootloader sets up the CPU state to boot into Supervisor mode.
+func (c *Core) Bootloader(entryPoint uint32) {
+	slog.Info("Running bootloader adapter to boot into S-mode", "entryPoint", fmt.Sprintf("0x%X", entryPoint))
+	// 1. Set mstatus.MPP to Supervisor mode (1)
+	c.csrs[csrMstatus] = (c.csrs[csrMstatus] & ^uint32(mstatusMPP)) | (ModeSupervisor << 11)
+
+	// 2. Set mepc to the entry point
+	c.csrs[csrMepc] = entryPoint
+
+	// 3. Delegate interrupts and exceptions to S-mode
+	c.csrs[csrMideleg] = 0xFFFF
+	c.csrs[csrMedeleg] = 0xFFFF
+
+	// 4. Perform MRET to transition to S-mode
+	mret(c)
+}

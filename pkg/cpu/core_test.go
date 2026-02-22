@@ -38,13 +38,42 @@ func TestSetRegister(t *testing.T) {
 }
 
 func TestGetRegister(t *testing.T) {
-	core := NewCore(&devices.Bus{})
-	regIndex := 10 // A0
-	regValue := uint32(0x87654321)
-	core.x[regIndex] = regValue
+	core := NewCore(nil)
+	core.SetRegister(1, 100)
+	if core.GetRegister(1) != 100 {
+		t.Errorf("Expected register 1 to be 100, got %d", core.GetRegister(1))
+	}
+	if core.GetRegister(0) != 0 {
+		t.Errorf("Expected register 0 to be 0, got %d", core.GetRegister(0))
+	}
+}
 
-	if core.GetRegister(regIndex) != regValue {
-		t.Errorf("Expected register %d to be %X, got %X", regIndex, regValue, core.GetRegister(regIndex))
+func TestBootloader(t *testing.T) {
+	core := NewCore(nil)
+	entryPoint := uint32(0x80000000)
+	core.Bootloader(entryPoint)
+
+	if core.mode != ModeSupervisor {
+		t.Errorf("Expected mode to be Supervisor (%d), got %d", ModeSupervisor, core.mode)
+	}
+
+	if core.pc != entryPoint {
+		t.Errorf("Expected PC to be 0x%X, got 0x%X", entryPoint, core.pc)
+	}
+
+	mstatus := core.csrs[csrMstatus]
+	if (mstatus & mstatusMPP) != 0 {
+		t.Errorf("Expected MPP to be cleared after MRET (User mode), got %d", (mstatus&mstatusMPP)>>11)
+	}
+
+	mideleg := core.csrs[csrMideleg]
+	if mideleg != 0xFFFF {
+		t.Errorf("Expected mideleg to be 0xFFFF, got 0x%X", mideleg)
+	}
+
+	medeleg := core.csrs[csrMedeleg]
+	if medeleg != 0xFFFF {
+		t.Errorf("Expected medeleg to be 0xFFFF, got 0x%X", medeleg)
 	}
 }
 
