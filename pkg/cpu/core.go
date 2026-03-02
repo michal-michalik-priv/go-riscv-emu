@@ -146,3 +146,44 @@ func (c *Core) Bootloader(entryPoint uint32) {
 	// 4. Perform MRET to transition to S-mode
 	mret(c)
 }
+
+// DumpState returns a string representation of the current CPU state.
+func (c *Core) DumpState() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	modeStr := ""
+	switch c.mode {
+	case ModeUser:
+		modeStr = "User"
+	case ModeSupervisor:
+		modeStr = "Supervisor"
+	case ModeMachine:
+		modeStr = "Machine"
+	default:
+		modeStr = fmt.Sprintf("Unknown (%d)", c.mode)
+	}
+
+	state := fmt.Sprintf("CPU State (Mode: %s):\n", modeStr)
+	state += fmt.Sprintf("PC: 0x%08X\n", c.pc)
+
+	state += "Registers:\n"
+	for i := 0; i < 32; i++ {
+		state += fmt.Sprintf(" x%-2d: 0x%08X", i, c.x[i])
+		if (i+1)%4 == 0 {
+			state += "\n"
+		}
+	}
+
+	state += "Key CSRs:\n"
+	state += fmt.Sprintf(" mstatus:  0x%08X  mtvec:    0x%08X  mepc:     0x%08X  mcause:   0x%08X\n",
+		c.csrs[csrMstatus], c.csrs[csrMtvec], c.csrs[csrMepc], c.csrs[csrMcause])
+	state += fmt.Sprintf(" mie:      0x%08X  mip:      0x%08X  mideleg:  0x%08X  medeleg:  0x%08X\n",
+		c.csrs[csrMie], c.csrs[csrMip], c.csrs[csrMideleg], c.csrs[csrMedeleg])
+	state += fmt.Sprintf(" sstatus:  0x%08X  stvec:    0x%08X  sepc:     0x%08X  scause:   0x%08X\n",
+		c.csrs[csrSstatus], c.csrs[csrStvec], c.csrs[csrSepc], c.csrs[csrScause])
+	state += fmt.Sprintf(" sie:      0x%08X  sip:      0x%08X\n",
+		c.csrs[csrSie], c.csrs[csrSip])
+
+	return state
+}

@@ -21,6 +21,11 @@ func (Bus *Bus) AddDevice(device BusDevice) {
 	Bus.devices = append(Bus.devices, device)
 }
 
+// GetDevices returns all devices attached to the bus.
+func (Bus *Bus) GetDevices() []BusDevice {
+	return Bus.devices
+}
+
 // FindDevice finds the Bus device that contains the specified address.
 func (Bus *Bus) FindDevice(address uint32) BusDevice {
 	for _, device := range Bus.devices {

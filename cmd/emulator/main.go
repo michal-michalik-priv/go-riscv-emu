@@ -4,6 +4,9 @@ import (
 	"flag"
 	"fmt"
 	"log/slog"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/michal-michalik-priv/go-riscv-emu/pkg/loader"
 	"github.com/michal-michalik-priv/go-riscv-emu/pkg/system"
@@ -49,6 +52,17 @@ func main() {
 	}
 
 	slog.Info("Emulator initialized. Starting execution...")
+
+	// Set up SIGINT handler
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGINT)
+
+	go func() {
+		<-sigChan
+		fmt.Printf("\n\n%s\n", system.DumpState())
+		slog.Info("SIGINT received, shutting down.")
+		os.Exit(0)
+	}()
 
 	if *steps == 0 {
 		for {

@@ -1,6 +1,7 @@
 package system
 
 import (
+	"fmt"
 	"log/slog"
 
 	"github.com/michal-michalik-priv/go-riscv-emu/pkg/cpu"
@@ -17,24 +18,24 @@ const (
 // System represents the entire emulation system, including the CPU and memory.
 type System struct {
 	core *cpu.Core
-	bus  devices.Bus
+	bus  *devices.Bus
 }
 
 // NewSystem initializes and returns a new System with a CPU core and RAM device.
 func NewSystem(dummy_tty bool) *System {
-	bus := devices.Bus{}
-	ramDevice := devices.RAMDevice{}
+	bus := &devices.Bus{}
+	ramDevice := &devices.RAMDevice{}
 	ramDevice.Initialize(RAMOffset, 0x10000000) // 256 MB RAM
-	bus.AddDevice(&ramDevice)
+	bus.AddDevice(ramDevice)
 
 	if dummy_tty {
-		dummyTTYDevice := devices.DummyTTYDevice{}
+		dummyTTYDevice := &devices.DummyTTYDevice{}
 		dummyTTYDevice.Initialize(DummyTTYOffset, 0x1) // 1 byte of Dummy TTY
-		bus.AddDevice(&dummyTTYDevice)
+		bus.AddDevice(dummyTTYDevice)
 	}
 
 	system := System{
-		core: cpu.NewCore(&bus),
+		core: cpu.NewCore(bus),
 		bus:  bus,
 	}
 
@@ -59,7 +60,7 @@ func (s *System) Bootloader(entryPoint uint32) {
 
 // Bus returns the device bus of the system.
 func (s *System) Bus() *devices.Bus {
-	return &s.bus
+	return s.bus
 }
 
 // Step executes a single instruction cycle of the CPU core.
@@ -69,4 +70,21 @@ func (s *System) Step() {
 		slog.Error("Failed to execute CPU step:", "error", err)
 		panic(err)
 	}
+}
+
+// DumpState returns a string representation of the current system state.
+func (s *System) DumpState() string {
+	state := s.core.DumpState()
+
+	// Add timer information if available
+	for _, device := range s.bus.GetDevices() {
+		if timer, ok := device.(*devices.TimerDevice); ok {
+			state += "Timer Registers:\n"
+			state += fmt.Sprintf(" mtime:    0x%016X\n", timer.GetMtime())
+			state += fmt.Sprintf(" mtimecmp: 0x%016X\n", timer.GetMtimecmp())
+			break
+		}
+	}
+
+	return state
 }
