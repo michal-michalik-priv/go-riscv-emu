@@ -10,25 +10,27 @@ const (
 	csrUstatus = 0x000
 
 	// Supervisor CSRs
-	csrSstatus = 0x100
-	csrSie     = 0x104
-	csrStvec   = 0x105
-	csrSepc    = 0x141
-	csrScause  = 0x142
-	csrStval   = 0x143
-	csrSip     = 0x144
+	csrSstatus    = 0x100
+	csrSie        = 0x104
+	csrStvec      = 0x105
+	csrScounteren = 0x106
+	csrSepc       = 0x141
+	csrScause     = 0x142
+	csrStval      = 0x143
+	csrSip        = 0x144
 
 	// Machine CSRs
-	csrMstatus = 0x300
-	csrMisa    = 0x301
-	csrMedeleg = 0x302
-	csrMideleg = 0x303
-	csrMie     = 0x304
-	csrMtvec   = 0x305
-	csrMepc    = 0x341
-	csrMcause  = 0x342
-	csrMtval   = 0x343
-	csrMip     = 0x344
+	csrMstatus    = 0x300
+	csrMisa       = 0x301
+	csrMedeleg    = 0x302
+	csrMideleg    = 0x303
+	csrMie        = 0x304
+	csrMtvec      = 0x305
+	csrMcounteren = 0x306
+	csrMepc       = 0x341
+	csrMcause     = 0x342
+	csrMtval      = 0x343
+	csrMip        = 0x344
 
 	// Machine Information Registers
 	csrMvendorid = 0xF11
@@ -71,7 +73,39 @@ func (c *Core) CanAccessCSR(address uint32, write bool) bool {
 		return false
 	}
 
-	return c.mode >= priv
+	if c.mode < priv {
+		return false
+	}
+
+	// Counter/Timer access control
+	if c.mode < ModeMachine {
+		switch address & 0xFFF {
+		case csrCycle, csrCycleH, csrTime, csrTimeH, csrInstret, csrInstretH:
+			var bit uint32
+			switch address & 0xFFF {
+			case csrCycle, csrCycleH:
+				bit = 0 // CY
+			case csrTime, csrTimeH:
+				bit = 1 // TM
+			case csrInstret, csrInstretH:
+				bit = 2 // IR
+			}
+
+			// Check mcounteren
+			if (c.csrs[csrMcounteren] & (1 << bit)) == 0 {
+				return false
+			}
+
+			// Check scounteren if in User mode
+			if c.mode == ModeUser {
+				if (c.csrs[csrScounteren] & (1 << bit)) == 0 {
+					return false
+				}
+			}
+		}
+	}
+
+	return true
 }
 
 // ReadCSR reads a CSR value after checking privilege.
@@ -156,6 +190,9 @@ func (c *Core) WriteCSR(address uint32, value uint32) error {
 	case csrMisa, csrMvendorid, csrMarchid, csrMimpid, csrMhartid:
 		// Read-only or WARL with no writable bits in this implementation
 		return nil
+	case csrMcounteren, csrScounteren:
+		// WARL: we only support CY, TM, IR (bits 0, 1, 2)
+		c.csrs[address] = value & 0x7
 	default:
 		c.csrs[address] = value
 	}
