@@ -45,6 +45,8 @@ func (d *TimerDevice) Start() {
 			if d.interruptHandler != nil {
 				if mtime >= mtimecmp {
 					d.interruptHandler(InterruptMTimer, true)
+				} else {
+					d.interruptHandler(InterruptMTimer, false)
 				}
 			}
 		}
@@ -104,4 +106,14 @@ func (d *TimerDevice) BaseAddress() uint32 {
 // Size returns the size of the timer device.
 func (d *TimerDevice) Size() uint32 {
 	return d.size
+}
+
+// GetMtime returns the current value of the mtime register.
+func (d *TimerDevice) GetMtime() uint64 {
+	return d.mtime.Load()
+}
+
+// GetMtimecmp returns the current value of the mtimecmp register.
+func (d *TimerDevice) GetMtimecmp() uint64 {
+	return d.mtimecmp.Load()
 }

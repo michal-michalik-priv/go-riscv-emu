@@ -46,11 +46,20 @@ func (c *Core) Trap(cause uint32, tval uint32) {
 func (c *Core) trap(cause uint32, tval uint32) {
 	slog.Debug(fmt.Sprintf("Trap: cause=%d, tval=%X, pc=%X, mode=%d", cause, tval, c.pc, c.mode))
 
+	isInterrupt := (cause >> 31) != 0
+	causeNum := cause & 0x7FFFFFFF
+
 	// Determine if we should delegate to S-mode
 	delegate := false
 	if c.mode < ModeMachine {
-		if (c.csrs[csrMedeleg]>>cause)&1 != 0 {
-			delegate = true
+		if isInterrupt {
+			if (c.csrs[csrMideleg]>>causeNum)&1 != 0 {
+				delegate = true
+			}
+		} else {
+			if (c.csrs[csrMedeleg]>>causeNum)&1 != 0 {
+				delegate = true
+			}
 		}
 	}
 
@@ -140,6 +149,17 @@ func (c *Core) CheckInterrupts() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	// Handle MTIP to STIP propagation if STIP is delegated to S-mode.
+	// In a real system this is done by M-mode software (SBI), but we can automate it
+	// to ensure S-mode sees the timer interrupt.
+	if (c.csrs[csrMideleg] & (1 << 5)) != 0 {
+		if (c.csrs[csrMip] & (1 << 7)) != 0 {
+			c.csrs[csrMip] |= (1 << 5)
+		} else {
+			c.csrs[csrMip] &^= (1 << 5)
+		}
+	}
+
 	pending := c.csrs[csrMip] & c.csrs[csrMie]
 	if pending == 0 {
 		return
@@ -147,41 +167,53 @@ func (c *Core) CheckInterrupts() {
 
 	mstatus := c.csrs[csrMstatus]
 
-	// Check for Machine-mode interrupts
-	mEnabled := (c.mode < ModeMachine) || (c.mode == ModeMachine && (mstatus&mstatusMIE) != 0)
-	if mEnabled {
-		mPending := pending & ((1 << 3) | (1 << 7) | (1 << 11)) // MSIP, MTIP, MEIP
-		if mPending != 0 {
+	// 1. Check for interrupts that trap to M-mode
+	// These are interrupts that are NOT delegated to S-mode
+	mPending := pending & ^c.csrs[csrMideleg]
+	if mPending != 0 {
+		mEnabled := (c.mode < ModeMachine) || (c.mode == ModeMachine && (mstatus&mstatusMIE) != 0)
+		if mEnabled {
 			var cause uint32
 			if (mPending & (1 << 11)) != 0 {
 				cause = InterruptMExternal
 			} else if (mPending & (1 << 3)) != 0 {
 				cause = InterruptMSoftware
-			} else {
+			} else if (mPending & (1 << 7)) != 0 {
 				cause = InterruptMTimer
+			} else if (mPending & (1 << 9)) != 0 {
+				cause = InterruptSExternal
+			} else if (mPending & (1 << 1)) != 0 {
+				cause = InterruptSSoftware
+			} else if (mPending & (1 << 5)) != 0 {
+				cause = InterruptSTimer
 			}
-			c.trap(cause, 0)
-			return
+
+			if cause != 0 {
+				c.trap(cause, 0)
+				return
+			}
 		}
 	}
 
-	// Check for Supervisor-mode interrupts
-	sEnabled := (c.mode < ModeSupervisor) || (c.mode == ModeSupervisor && (mstatus&mstatusSIE) != 0)
-	if sEnabled {
-		sPending := pending & ((1 << 1) | (1 << 5) | (1 << 9)) // SSIP, STIP, SEIP
-		// Filter out those delegated to S-mode
-		sPending &= c.csrs[csrMideleg]
-		if sPending != 0 {
+	// 2. Check for interrupts that trap to S-mode
+	// These are interrupts that ARE delegated to S-mode
+	sPending := pending & c.csrs[csrMideleg]
+	if sPending != 0 {
+		sEnabled := (c.mode < ModeSupervisor) || (c.mode == ModeSupervisor && (mstatus&mstatusSIE) != 0)
+		if sEnabled {
 			var cause uint32
 			if (sPending & (1 << 9)) != 0 {
 				cause = InterruptSExternal
 			} else if (sPending & (1 << 1)) != 0 {
 				cause = InterruptSSoftware
-			} else {
+			} else if (sPending & (1 << 5)) != 0 {
 				cause = InterruptSTimer
 			}
-			c.trap(cause, 0)
-			return
+
+			if cause != 0 {
+				c.trap(cause, 0)
+				return
+			}
 		}
 	}
 }
