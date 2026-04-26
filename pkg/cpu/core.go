@@ -147,6 +147,11 @@ func (c *Core) Bootloader(entryPoint uint32) {
 	mret(c)
 }
 
+// GetRegisters returns all general-purpose registers.
+func (c *Core) GetRegisters() [32]uint32 {
+	return c.x
+}
+
 // DumpState returns a string representation of the current CPU state.
 func (c *Core) DumpState() string {
 	c.mu.Lock()
