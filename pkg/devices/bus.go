@@ -41,7 +41,7 @@ func (Bus *Bus) FindDevice(address uint32) BusDevice {
 func (Bus *Bus) Read(address uint32) (byte, error) {
 	device := Bus.FindDevice(address)
 	if device == nil {
-		return 0, fmt.Errorf("device not found for address %X read", address)
+		return 0, fmt.Errorf("device not found for address %08X read", address)
 	}
 	return device.Read(address)
 }
@@ -50,7 +50,7 @@ func (Bus *Bus) Read(address uint32) (byte, error) {
 func (Bus *Bus) Write(address uint32, value byte) error {
 	device := Bus.FindDevice(address)
 	if device == nil {
-		return fmt.Errorf("device not found for address %X write", address)
+		return fmt.Errorf("device not found for address %08X write", address)
 	}
 	return device.Write(address, value)
 }
