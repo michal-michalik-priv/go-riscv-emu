@@ -64,6 +64,12 @@ func handleSBI(core *Core) bool {
 		core.SetRegister(11, 0)
 		core.pc += 4
 		return true
+	case 0x10: // RISC-V Hart State Management (HSM) or other extensions
+		// Just return success for now
+		core.SetRegister(10, uint32(SBI_SUCCESS))
+		core.SetRegister(11, 0)
+		core.pc += 4
+		return true
 	default:
 		slog.Warn(fmt.Sprintf("Unsupported SBI call EID: 0x%x, FID: 0x%x", eid, fid))
 		errCode := int32(SBI_ERR_NOT_SUPPORTED)
