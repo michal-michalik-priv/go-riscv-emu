@@ -111,6 +111,8 @@ func (c *Core) handleTrapS(cause uint32, tval uint32) {
 	c.csrs[csrStval] = tval
 	c.csrs[csrScause] = cause
 
+	slog.Debug(fmt.Sprintf("S-Trap: cause=%X, sepc=%X, mode=%d", cause, c.pc, c.mode))
+
 	// Update sstatus (shadowed by mstatus)
 	// SPIE = SIE
 	if (c.csrs[csrMstatus] & mstatusSIE) != 0 {
