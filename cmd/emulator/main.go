@@ -66,7 +66,16 @@ func main() {
 
 	if *steps == 0 {
 		for {
-			system.Step()
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						fmt.Printf("\n\nPanic recovered: %v\n", r)
+						fmt.Printf("%s\n", system.DumpState())
+						os.Exit(1)
+					}
+				}()
+				system.Step()
+			}()
 		}
 	} else {
 		for i := 0; i < *steps; i++ {
