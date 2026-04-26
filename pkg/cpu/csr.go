@@ -127,9 +127,9 @@ func (c *Core) ReadCSR(address uint32) (uint32, error) {
 		return c.csrs[csrMie] & c.csrs[csrMideleg], nil
 	case csrSip:
 		return c.csrs[csrMip] & c.csrs[csrMideleg], nil
-	case csrCycle:
+	case csrCycle, csrMcycle:
 		return c.csrs[csrMcycle], nil
-	case csrCycleH:
+	case csrCycleH, csrMcycleH:
 		return c.csrs[csrMcycleH], nil
 	case csrInstret:
 		return c.csrs[csrMinstret], nil
