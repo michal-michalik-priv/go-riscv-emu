@@ -85,13 +85,19 @@ func (c *Core) GetRegister(index int) uint32 {
 func (c *Core) Fetch() uint32 {
 	slog.Debug(fmt.Sprintf("Fetching instruction at PC: %X", c.pc))
 
-	byte1, _ := c.bus.Read(c.pc)
-	byte2, _ := c.bus.Read(c.pc + 1)
-	byte3, _ := c.bus.Read(c.pc + 2)
-	byte4, _ := c.bus.Read(c.pc + 3)
+	byte1, err1 := c.bus.Read(c.pc)
+	byte2, err2 := c.bus.Read(c.pc + 1)
+	byte3, err3 := c.bus.Read(c.pc + 2)
+	byte4, err4 := c.bus.Read(c.pc + 3)
+
+	if err1 != nil || err2 != nil || err3 != nil || err4 != nil {
+		slog.Error(fmt.Sprintf("Error fetching instruction at PC %X: %v, %v, %v, %v", c.pc, err1, err2, err3, err4))
+	}
 
 	instruction := uint32(byte1) | (uint32(byte2) << 8) |
 		(uint32(byte3) << 16) | (uint32(byte4) << 24)
+
+	slog.Debug(fmt.Sprintf("Fetched instruction: %08X at PC %X", instruction, c.pc))
 
 	return instruction
 }
