@@ -7,7 +7,14 @@ import (
 // CSR addresses (subset)
 const (
 	// User CSRs
-	csrUstatus = 0x000
+	csrUstatus  = 0x000
+	csrUie      = 0x004
+	csrUtvec    = 0x005
+	csrUscratch = 0x040
+	csrUepc     = 0x041
+	csrUcause   = 0x042
+	csrUtval    = 0x043
+	csrUip      = 0x044
 
 	// Supervisor CSRs
 	csrSstatus    = 0x100
@@ -51,6 +58,12 @@ const (
 	csrCycleH   = 0xC80
 	csrTimeH    = 0xC81
 	csrInstretH = 0xC82
+
+	// Debug CSRs (not fully supported)
+	csrTselect  = 0x7A0
+	csrTdata1   = 0x7A1
+	csrTdata2   = 0x7A2
+	csrTcontrol = 0x7A3
 )
 
 // mstatus/sstatus bit masks (simplified)
@@ -187,6 +200,13 @@ func (c *Core) WriteCSR(address uint32, value uint32) error {
 		c.csrs[csrMip] = value
 	case csrMstatus:
 		c.csrs[csrMstatus] = value
+	case csrUie, csrUtvec, csrUscratch, csrUepc, csrUcause, csrUtval, csrUip:
+		// User-mode CSRs - store in csrs array
+		c.csrs[address] = value
+	case csrTselect, csrTdata1, csrTdata2, csrTcontrol:
+		// Debug CSRs - not supported, return without writing
+		// This allows the test to detect that debug is not implemented
+		return nil
 	case csrMisa, csrMvendorid, csrMarchid, csrMimpid, csrMhartid:
 		// Read-only or WARL with no writable bits in this implementation
 		return nil
