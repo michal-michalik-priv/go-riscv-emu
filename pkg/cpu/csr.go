@@ -213,6 +213,22 @@ func (c *Core) WriteCSR(address uint32, value uint32) error {
 	case csrMcounteren, csrScounteren:
 		// WARL: we only support CY, TM, IR (bits 0, 1, 2)
 		c.csrs[address] = value & 0x7
+	case csrMinstret:
+		// For RV32, writing to minstret sets the low 32 bits
+		// Writing to minstret suppresses the increment for the next instruction
+		c.csrs[csrMinstret] = value
+		c.instretSuppressed = true
+	case csrMinstretH:
+		// For RV32, writing to minstreth sets the high 32 bits
+		// Writing to minstreth is treated as a write to minstret and suppresses increment
+		c.csrs[csrMinstretH] = value
+		c.instretSuppressed = true
+	case csrMcycle:
+		// For RV32, writing to mcycle sets the low 32 bits
+		c.csrs[csrMcycle] = value
+	case csrMcycleH:
+		// For RV32, writing to mcycleh sets the high 32 bits
+		c.csrs[csrMcycleH] = value
 	default:
 		c.csrs[address] = value
 	}

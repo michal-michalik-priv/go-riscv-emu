@@ -15,27 +15,28 @@ const (
 	ModeMachine    uint32 = 3
 )
 
-// Core represents the CPU core with its registers and program counter.
+// Core represents a RISC-V CPU core.
 type Core struct {
-	pc   uint32
-	x    [32]uint32
-	csrs [4096]uint32
-	bus  *devices.Bus
-	mode uint32
-
-	loadReservationAddr  uint32
-	loadReservationValid bool
+	bus                  *devices.Bus
+	pc                   uint32
+	x                    [32]uint32
+	csrs                 map[uint32]uint32
+	mode                 uint32
 	wfi                  bool
 	mu                   sync.Mutex
+	instretSuppressed    bool // Suppress instret increment for next instruction
+	loadReservationAddr  uint32
+	loadReservationValid bool
 }
 
 // NewCore creates and initializes a new CPU core with the given bus.
 func NewCore(bus *devices.Bus) *Core {
+	csrs := make(map[uint32]uint32)
 	core := &Core{
 		pc:   0,
 		bus:  bus,
 		x:    [32]uint32{},
-		csrs: [4096]uint32{},
+		csrs: csrs,
 		mode: ModeMachine,
 
 		loadReservationAddr:  0,
@@ -126,7 +127,7 @@ func (c *Core) IncrementCounters(retired bool) {
 		c.csrs[csrMcycleH]++
 	}
 
-	if retired {
+	if retired && !c.instretSuppressed {
 		// Increment minstret
 		oldInstret := c.csrs[csrMinstret]
 		c.csrs[csrMinstret]++
@@ -134,6 +135,9 @@ func (c *Core) IncrementCounters(retired bool) {
 			c.csrs[csrMinstretH]++
 		}
 	}
+
+	// Clear the suppression flag after checking
+	c.instretSuppressed = false
 }
 
 // Bootloader sets up the CPU state to boot into Supervisor mode.
