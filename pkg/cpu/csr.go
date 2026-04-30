@@ -207,7 +207,11 @@ func (c *Core) WriteCSR(address uint32, value uint32) error {
 		// Debug CSRs - not supported, return without writing
 		// This allows the test to detect that debug is not implemented
 		return nil
-	case csrMisa, csrMvendorid, csrMarchid, csrMimpid, csrMhartid:
+	case csrMisa:
+		// WARL: allow clearing extension bits to simulate unsupported extensions
+		// This allows tests to disable C extension and skip RVC tests
+		c.csrs[csrMisa] = value & ((1 << 30) | (1 << 0) | (1 << 2) | (1 << 8) | (1 << 12) | (1 << 18) | (1 << 20))
+	case csrMvendorid, csrMarchid, csrMimpid, csrMhartid:
 		// Read-only or WARL with no writable bits in this implementation
 		return nil
 	case csrMcounteren, csrScounteren:
