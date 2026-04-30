@@ -669,6 +669,11 @@ func bgeu(core *Core, instr bTypeInstruction) error {
 // slli executes the SLLI instruction on the given core.
 func slli(core *Core, instr iTypeInstruction) error {
 	slog.Debug(fmt.Sprintf("Executing SLLI instruction: %+v\n", instr))
+	// Check for illegal shamt[5] in RV32
+	if (instr.imm & 0x20) != 0 {
+		core.Trap(ExceptionIllegalInstruction, 0)
+		return nil
+	}
 	shamt := uint32(instr.imm) & 0x1F
 	val := core.GetRegister(int(instr.rs1)) << shamt
 	core.SetRegister(int(instr.rd), val)
@@ -679,6 +684,11 @@ func slli(core *Core, instr iTypeInstruction) error {
 // srli executes the SRLI instruction on the given core.
 func srli(core *Core, instr iTypeInstruction) error {
 	slog.Debug(fmt.Sprintf("Executing SRLI instruction: %+v\n", instr))
+	// Check for illegal shamt[5] in RV32
+	if (instr.imm & 0x20) != 0 {
+		core.Trap(ExceptionIllegalInstruction, 0)
+		return nil
+	}
 	shamt := uint32(instr.imm) & 0x1F
 	val := core.GetRegister(int(instr.rs1)) >> shamt
 	core.SetRegister(int(instr.rd), val)
@@ -689,8 +699,14 @@ func srli(core *Core, instr iTypeInstruction) error {
 // srai executes the SRAI instruction on the given core.
 func srai(core *Core, instr iTypeInstruction) error {
 	slog.Debug(fmt.Sprintf("Executing SRAI instruction: %+v\n", instr))
+	// Check for illegal shamt[5] in RV32
+	if (instr.imm & 0x20) != 0 {
+		core.Trap(ExceptionIllegalInstruction, 0)
+		return nil
+	}
 	shamt := uint32(instr.imm) & 0x1F
-	val := int32(core.GetRegister(int(instr.rs1))) >> shamt
+	rs1Val := core.GetRegister(int(instr.rs1))
+	val := int32(rs1Val) >> shamt
 	core.SetRegister(int(instr.rd), uint32(val))
 	core.pc += 4
 	return nil
