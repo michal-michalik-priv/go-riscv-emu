@@ -54,12 +54,12 @@ rv32um-p-rem
 rv32um-p-remu
 rv32mi-p-breakpoint
 rv32mi-p-csr
-#rv32mi-p-illegal
+#rv32mi-p-illegal # Requires MMU/Virtual Memory support (sfence.vma)
 rv32mi-p-instret_overflow
 rv32mi-p-lh-misaligned
 rv32mi-p-lw-misaligned
 rv32mi-p-ma_addr
-rv32mi-p-ma_fetch
+#rv32mi-p-ma_fetch # Requires RVC (compressed instructions) support
 rv32mi-p-mcsr
 rv32mi-p-pmpaddr
 rv32mi-p-sbreak
@@ -67,10 +67,11 @@ rv32mi-p-scall
 rv32mi-p-sh-misaligned
 rv32mi-p-shamt
 rv32mi-p-sw-misaligned
+rv32mi-p-scall
 rv32mi-p-zicntr
 rv32si-p-csr
-rv32si-p-dirty
-rv32si-p-ma_fetch
+#rv32si-p-dirty # Requires MMU/Virtual Memory support
+#rv32si-p-ma_fetch # Requires RVC (compressed instructions) support
 rv32si-p-sbreak
 rv32si-p-scall
 rv32si-p-wfi
