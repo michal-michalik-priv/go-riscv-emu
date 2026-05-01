@@ -812,7 +812,6 @@ func mret(core *Core) error {
 
 // sret executes the SRET instruction on the given core.
 func sret(core *Core) error {
-	slog.Debug("Executing SRET instruction")
 	if core.mode < ModeSupervisor {
 		core.Trap(ExceptionIllegalInstruction, 0)
 		return nil
@@ -822,8 +821,10 @@ func sret(core *Core) error {
 	mstatus := core.csrs[csrMstatus]
 	if (mstatus & mstatusSPP) != 0 {
 		core.mode = ModeSupervisor
+		slog.Debug(fmt.Sprintf("SRET: Staying in Supervisor mode, pc=%X, sepc=%X", core.pc, core.csrs[csrSepc]))
 	} else {
 		core.mode = ModeUser
+		slog.Debug(fmt.Sprintf("SRET: Switching to User mode, pc=%X, sepc=%X", core.pc, core.csrs[csrSepc]))
 	}
 
 	// Restore interrupt enable: SIE = SPIE
@@ -894,6 +895,7 @@ func ecall(core *Core) error {
 	cause := uint32(0)
 	switch core.mode {
 	case ModeUser:
+		slog.Debug(fmt.Sprintf("ECALL from User mode: pc=%X, a7=%d", core.pc, core.GetRegister(7)))
 		cause = ExceptionEnvironmentCallFromUMode
 	case ModeSupervisor:
 		cause = ExceptionEnvironmentCallFromSMode

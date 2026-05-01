@@ -63,6 +63,10 @@ func (c *Core) trap(cause uint32, tval uint32) {
 		}
 	}
 
+	if c.mode == ModeUser {
+		slog.Debug(fmt.Sprintf("Trap from User mode: cause=%d, delegate=%v, medeleg=%X, mideleg=%X", cause, delegate, c.csrs[csrMedeleg], c.csrs[csrMideleg]))
+	}
+
 	if delegate {
 		c.handleTrapS(cause, tval)
 	} else {
