@@ -17,6 +17,24 @@ const (
 
 const clintBase = 0x02000000
 
+var stdinChan chan byte
+
+func init() {
+	stdinChan = make(chan byte, 256)
+	go func() {
+		buf := make([]byte, 1)
+		for {
+			n, err := os.Stdin.Read(buf)
+			if err != nil {
+				return
+			}
+			if n > 0 {
+				stdinChan <- buf[0]
+			}
+		}
+	}()
+}
+
 // handleSBI handles SBI calls from Supervisor mode.
 // It returns true if the call was handled, false otherwise.
 func handleSBI(core *Core) bool {
@@ -66,8 +84,12 @@ func handleSBI(core *Core) bool {
 		core.pc += 4
 		return true
 	case 2: // sbi_console_getchar (legacy v0.1)
-		// No input available, return -1
-		core.SetRegister(10, 0xFFFFFFFF)
+		select {
+		case ch := <-stdinChan:
+			core.SetRegister(10, uint32(ch))
+		default:
+			core.SetRegister(10, 0xFFFFFFFF) // no input available
+		}
 		core.pc += 4
 		return true
 	case 3: // sbi_clear_ipi (legacy v0.1)

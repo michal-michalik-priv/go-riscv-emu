@@ -20,7 +20,7 @@ type Core struct {
 	bus                  *devices.Bus
 	pc                   uint32
 	x                    [32]uint32
-	csrs                 map[uint32]uint32
+	csrs                 [4096]uint32
 	mode                 uint32
 	wfi                  bool
 	mu                   sync.Mutex
@@ -31,12 +31,10 @@ type Core struct {
 
 // NewCore creates and initializes a new CPU core with the given bus.
 func NewCore(bus *devices.Bus) *Core {
-	csrs := make(map[uint32]uint32)
 	core := &Core{
 		pc:   0,
 		bus:  bus,
 		x:    [32]uint32{},
-		csrs: csrs,
 		mode: ModeMachine,
 
 		loadReservationAddr:  0,
