@@ -3,6 +3,7 @@ package cpu
 import (
 	"fmt"
 	"log/slog"
+	"os"
 
 	"github.com/michal-michalik-priv/go-riscv-emu/pkg/devices"
 )
@@ -55,6 +56,30 @@ func handleSBI(core *Core) bool {
 		core.SetRegister(10, uint32(SBI_SUCCESS))
 		core.SetRegister(11, 0)
 		core.pc += 4
+		return true
+	case 2: // sbi_console_getchar (legacy v0.1)
+		// No input available, return -1
+		core.SetRegister(10, 0xFFFFFFFF)
+		core.pc += 4
+		return true
+	case 3: // sbi_clear_ipi (legacy v0.1)
+		core.SetRegister(10, uint32(SBI_SUCCESS))
+		core.pc += 4
+		return true
+	case 4: // sbi_send_ipi (legacy v0.1)
+		// Single hart system, IPI is a no-op
+		core.SetRegister(10, uint32(SBI_SUCCESS))
+		core.pc += 4
+		return true
+	case 5, 6, 7: // sbi_remote_fence_i, sbi_remote_sfence_vma, sbi_remote_sfence_vma_asid
+		// No-op on single hart, no MMU
+		core.SetRegister(10, uint32(SBI_SUCCESS))
+		core.pc += 4
+		return true
+	case 8: // sbi_shutdown (legacy v0.1)
+		slog.Info("SBI shutdown requested")
+		fmt.Printf("\n%s\n", core.DumpState())
+		os.Exit(0)
 		return true
 	case 0x10: // RISC-V Hart State Management (HSM) or other extensions
 		// Just return success for now
