@@ -153,7 +153,10 @@ func (c *Core) Bootloader(entryPoint uint32) {
 	c.csrs[csrMideleg] = 0xFFFF
 	c.csrs[csrMedeleg] = 0xFFFF
 
-	// 4. Perform MRET to transition to S-mode
+	// 4. Allow S-mode access to counters/timers (CY=0, TM=1, IR=2)
+	c.csrs[csrMcounteren] = 0x7
+
+	// 5. Perform MRET to transition to S-mode
 	mret(c)
 }
 
