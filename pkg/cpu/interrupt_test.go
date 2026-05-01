@@ -18,8 +18,8 @@ func TestInterruptDelegation(t *testing.T) {
 	core.csrs[csrStvec] = 0x80000100    // S-mode trap vector
 	core.pc = 0x80000000
 
-	// Trigger STIP
-	core.SetInterrupt(1<<5, true)
+	// Trigger MTIP (which propagates to STIP when delegated)
+	core.SetInterrupt(1<<7, true)
 
 	// Execute one step. It should take the trap.
 	// Since there's no instruction at 0x80000000, we'll just check if PC changed to stvec
