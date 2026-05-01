@@ -38,17 +38,10 @@ func init() {
 // handleSBI handles SBI calls from Supervisor mode.
 // It returns true if the call was handled, false otherwise.
 func handleSBI(core *Core) bool {
-	if core.mode == ModeUser {
-		// SBI calls are only valid in Supervisor mode
-		// For User mode, return error code
-		errCode := int32(SBI_ERR_NOT_SUPPORTED)
-		core.SetRegister(10, uint32(errCode))
-		core.SetRegister(11, 0)
-		core.pc += 4
-		return true
-	}
 	if core.mode != ModeSupervisor {
-		// For Machine mode, return false to let regular ECALL handling proceed
+		// SBI calls are only valid in Supervisor mode.
+		// User mode ECALLs are Linux syscalls — let them trap to the kernel.
+		// Machine mode ECALLs should also be handled normally.
 		return false
 	}
 
@@ -78,6 +71,9 @@ func handleSBI(core *Core) bool {
 		return true
 	case sbiConsolePutchar:
 		char := byte(core.GetRegister(10)) // a0
+		if char == '\n' {
+			slog.Debug("SBI putchar: newline")
+		}
 		fmt.Print(string(char))
 		core.SetRegister(10, uint32(SBI_SUCCESS))
 		core.SetRegister(11, 0)
