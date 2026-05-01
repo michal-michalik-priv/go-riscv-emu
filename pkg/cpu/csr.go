@@ -183,7 +183,8 @@ func (c *Core) WriteCSR(address uint32, value uint32) error {
 	switch address {
 	case csrSstatus:
 		// Write to sstatus actually writes to mstatus with a mask
-		mask := uint32(0x800DE122)
+		// Include SPP bit (bit 8) to allow mode transitions
+		mask := uint32(0x800DE122) | mstatusSPP
 		c.csrs[csrMstatus] = (c.csrs[csrMstatus] & ^mask) | (value & mask)
 	case csrSie:
 		mideleg := c.csrs[csrMideleg]
