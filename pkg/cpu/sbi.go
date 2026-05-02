@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/michal-michalik-priv/go-riscv-emu/pkg/devices"
+	"github.com/michal-michalik-priv/go-riscv-emu/pkg/utils"
 )
 
 const (
@@ -117,6 +118,7 @@ func handleSBI(core *Core) bool {
 	case sbiLegacyShutdown: // sbi_shutdown (legacy v0.1)
 		slog.Info("SBI shutdown requested")
 		fmt.Printf("\n%s\n", core.DumpState())
+		_ = utils.SetTerminalEchoEnabled(true)
 		os.Exit(0)
 		return true
 	case sbiExtHSM: // RISC-V Hart State Management (HSM) or other extensions

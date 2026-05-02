@@ -479,9 +479,11 @@ func sw(core *Core, instr sTypeInstruction) error {
 	if address == 0x80001000 {
 		if value == 1 {
 			slog.Info("TESTS PASSED")
+			_ = utils.SetTerminalEchoEnabled(true)
 			os.Exit(0)
 		} else {
 			slog.Info(fmt.Sprintf("TESTS FAILED (no. %d)", value>>1))
+			_ = utils.SetTerminalEchoEnabled(true)
 			os.Exit(1)
 		}
 	}
@@ -878,9 +880,11 @@ func ecall(core *Core) error {
 	sysc := uint32(93)
 	if a10 == 0 && a17 == sysc {
 		slog.Info("TESTS PASSED")
+		_ = utils.SetTerminalEchoEnabled(true)
 		os.Exit(0)
 	} else if a10 != 0 && a17 == sysc {
 		slog.Info(fmt.Sprintf("TESTS FAILED (no. %+v)", a10))
+		_ = utils.SetTerminalEchoEnabled(true)
 		os.Exit(1)
 	}
 

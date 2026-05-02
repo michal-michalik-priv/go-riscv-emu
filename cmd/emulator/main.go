@@ -10,6 +10,7 @@ import (
 
 	"github.com/michal-michalik-priv/go-riscv-emu/pkg/loader"
 	"github.com/michal-michalik-priv/go-riscv-emu/pkg/system"
+	"github.com/michal-michalik-priv/go-riscv-emu/pkg/utils"
 )
 
 func main() {
@@ -27,6 +28,15 @@ func main() {
 	}
 
 	slog.Info("Starting RISC-V RV32I Emulator")
+	if err := utils.SetTerminalEchoEnabled(false); err != nil {
+		slog.Warn("Failed to disable terminal echo", "error", err)
+	}
+	defer func() {
+		if err := utils.SetTerminalEchoEnabled(true); err != nil {
+			slog.Warn("Failed to restore terminal echo", "error", err)
+		}
+	}()
+
 	system := system.NewSystem(*dummyTTY)
 
 	var err error
@@ -55,6 +65,9 @@ func main() {
 
 	go func() {
 		<-sigChan
+		if err := utils.SetTerminalEchoEnabled(true); err != nil {
+			slog.Warn("Failed to restore terminal echo", "error", err)
+		}
 		fmt.Printf("\n\n%s\n", system.DumpState())
 		slog.Info("SIGINT received, shutting down.")
 		os.Exit(0)
