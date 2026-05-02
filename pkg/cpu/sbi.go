@@ -27,6 +27,7 @@ const clintBase = 0x02000000
 
 var stdinChan chan byte
 
+// init starts asynchronous stdin buffering used by legacy SBI getchar.
 func init() {
 	stdinChan = make(chan byte, 256)
 	go func() {
