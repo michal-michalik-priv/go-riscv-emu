@@ -89,11 +89,14 @@ func handleSBI(core *Core) bool {
 		core.pc += 4
 		return true
 	case 3: // sbi_clear_ipi (legacy v0.1)
+		// Single-hart: clear local supervisor software interrupt pending (SSIP)
+		core.SetInterrupt(1<<1, false)
 		core.SetRegister(10, uint32(SBI_SUCCESS))
 		core.pc += 4
 		return true
 	case 4: // sbi_send_ipi (legacy v0.1)
-		// Single hart system, IPI is a no-op
+		// Single-hart: emulate IPI as local SSIP raise
+		core.SetInterrupt(1<<1, true)
 		core.SetRegister(10, uint32(SBI_SUCCESS))
 		core.pc += 4
 		return true
