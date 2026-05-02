@@ -25,7 +25,7 @@ const (
 
 // Interrupt codes (top bit set)
 const (
-	InterruptUSoftware = (1 << 31) | 0
+	InterruptUSoftware = (1 << 31)
 	InterruptSSoftware = (1 << 31) | 1
 	InterruptMSoftware = (1 << 31) | 3
 	InterruptUTimer    = (1 << 31) | 4
