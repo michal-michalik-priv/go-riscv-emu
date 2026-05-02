@@ -12,6 +12,8 @@ const (
 	MTIME_OFFSET = 0xBFF8
 	// InterruptMTimer is the bit for Machine Timer Interrupt in mip/mie
 	InterruptMTimer = uint32(1 << 7)
+	// mtime ticks advanced each wall-clock timer tick
+	mtimeTicksPerWallTick = uint64(10)
 )
 
 // TimerDevice implements a simple RISC-V timer (part of CLINT).
@@ -40,7 +42,7 @@ func (d *TimerDevice) Start() {
 		ticker := time.NewTicker(time.Millisecond)
 		defer ticker.Stop()
 		for range ticker.C {
-			mtime := d.mtime.Add(1)
+			mtime := d.mtime.Add(mtimeTicksPerWallTick)
 			mtimecmp := d.mtimecmp.Load()
 			if d.interruptHandler != nil {
 				if mtime >= mtimecmp {
