@@ -1,0 +1,42 @@
+/dts-v1/;
+
+/ {
+    #address-cells = <1>;
+    #size-cells = <1>;
+    model = "Minimal RV32IMA SBI-only";
+    compatible = "minimal-rv32ima-board";
+
+    cpus {
+        #address-cells = <1>;
+        #size-cells = <0>;
+        timebase-frequency = <10000>;
+
+        cpu@0 {
+            device_type = "cpu";
+            reg = <0>;
+            status = "okay";
+            compatible = "riscv";
+            riscv,isa = "rv32ima";
+
+            /* Kluczowe dla braku MMU */
+            mmu-type = "riscv,none";
+
+            interrupt-controller {
+                #interrupt-cells = <1>;
+                interrupt-controller;
+                compatible = "riscv,cpu-intc";
+            };
+        };
+    };
+
+    memory@80000000 {
+        device_type = "memory";
+        reg = <0x80000000 0x08000000>;
+    };
+
+    chosen {
+        stdout-path = "/cpus/cpu@0"; 
+        bootargs = "earlycon=sbi console=sbi";
+    };
+};
+
