@@ -58,14 +58,6 @@ const (
 	rTypeFunc3SrlSra   = 0b101
 	rTypeFunc3Or       = 0b110
 	rTypeFunc3And      = 0b111
-	rTypeFunc3Mul      = 0b000
-	rTypeFunc3Mulh     = 0b001
-	rTypeFunc3Mulhsu   = 0b010
-	rTypeFunc3Mulhu    = 0b011
-	rTypeFunc3Div      = 0b100
-	rTypeFunc3Divu     = 0b101
-	rTypeFunc3Rem      = 0b110
-	rTypeFunc3Remu     = 0b111
 	rTypeFunc3AtomicW  = 0b010
 	iTypeFunc3Fence    = 0b000
 	iTypeFunc3FenceI   = 0b001
