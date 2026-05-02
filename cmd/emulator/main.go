@@ -14,7 +14,7 @@ import (
 
 func main() {
 	debug := flag.Bool("debug", false, "Enable debug logging")
-	elfPath := flag.String("elf", "", "Path to the ELF file to load")
+	elfPath := flag.String("elf", "misc/c/empty_main.o", "Path to the ELF file to load")
 	kernelPath := flag.String("kernel", "", "Path to the raw binary kernel file to load")
 	kernelAddr := flag.Uint("kernel-addr", 0x80000000, "Address to load the raw binary kernel at")
 	steps := flag.Int("steps", 0, "Number of steps to execute (0 for infinite, default)")
@@ -34,12 +34,8 @@ func main() {
 		slog.Info("Initializing system and loading kernel binary", "path", *kernelPath, "addr", fmt.Sprintf("0x%X", *kernelAddr))
 		err = loader.LoadBinaryToSystem(*kernelPath, uint32(*kernelAddr), system)
 	} else {
-		path := *elfPath
-		if path == "" {
-			path = "misc/c/empty_main.o"
-		}
-		slog.Info("Initializing system and loading ELF file", "path", path)
-		err = loader.LoadELFToSystem(path, system)
+		slog.Info("Initializing system and loading ELF file", "path", *elfPath)
+		err = loader.LoadELFToSystem(*elfPath, system)
 	}
 
 	if err != nil {
