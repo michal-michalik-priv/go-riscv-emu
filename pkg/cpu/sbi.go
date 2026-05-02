@@ -9,10 +9,18 @@ import (
 )
 
 const (
-	sbiSetTimer           = 0
-	sbiConsolePutchar     = 1
-	SBI_SUCCESS           = 0
-	SBI_ERR_NOT_SUPPORTED = -2
+	sbiSetTimer                  = 0
+	sbiConsolePutchar            = 1
+	sbiLegacyConsoleGetchar      = 2
+	sbiLegacyClearIPI            = 3
+	sbiLegacySendIPI             = 4
+	sbiLegacyRemoteFenceI        = 5
+	sbiLegacyRemoteSFenceVMA     = 6
+	sbiLegacyRemoteSFenceVMAASID = 7
+	sbiLegacyShutdown            = 8
+	sbiExtHSM                    = 0x10
+	SBI_SUCCESS                  = 0
+	SBI_ERR_NOT_SUPPORTED        = -2
 )
 
 const clintBase = 0x02000000
@@ -79,7 +87,7 @@ func handleSBI(core *Core) bool {
 		core.SetRegister(11, 0)
 		core.pc += 4
 		return true
-	case 2: // sbi_console_getchar (legacy v0.1)
+	case sbiLegacyConsoleGetchar: // sbi_console_getchar (legacy v0.1)
 		select {
 		case ch := <-stdinChan:
 			core.SetRegister(10, uint32(ch))
@@ -88,29 +96,29 @@ func handleSBI(core *Core) bool {
 		}
 		core.pc += 4
 		return true
-	case 3: // sbi_clear_ipi (legacy v0.1)
+	case sbiLegacyClearIPI: // sbi_clear_ipi (legacy v0.1)
 		// Single-hart: clear local supervisor software interrupt pending (SSIP)
 		core.SetInterrupt(1<<1, false)
 		core.SetRegister(10, uint32(SBI_SUCCESS))
 		core.pc += 4
 		return true
-	case 4: // sbi_send_ipi (legacy v0.1)
+	case sbiLegacySendIPI: // sbi_send_ipi (legacy v0.1)
 		// Single-hart: emulate IPI as local SSIP raise
 		core.SetInterrupt(1<<1, true)
 		core.SetRegister(10, uint32(SBI_SUCCESS))
 		core.pc += 4
 		return true
-	case 5, 6, 7: // sbi_remote_fence_i, sbi_remote_sfence_vma, sbi_remote_sfence_vma_asid
+	case sbiLegacyRemoteFenceI, sbiLegacyRemoteSFenceVMA, sbiLegacyRemoteSFenceVMAASID: // sbi_remote_fence_i, sbi_remote_sfence_vma, sbi_remote_sfence_vma_asid
 		// No-op on single hart, no MMU
 		core.SetRegister(10, uint32(SBI_SUCCESS))
 		core.pc += 4
 		return true
-	case 8: // sbi_shutdown (legacy v0.1)
+	case sbiLegacyShutdown: // sbi_shutdown (legacy v0.1)
 		slog.Info("SBI shutdown requested")
 		fmt.Printf("\n%s\n", core.DumpState())
 		os.Exit(0)
 		return true
-	case 0x10: // RISC-V Hart State Management (HSM) or other extensions
+	case sbiExtHSM: // RISC-V Hart State Management (HSM) or other extensions
 		// Just return success for now
 		core.SetRegister(10, uint32(SBI_SUCCESS))
 		core.SetRegister(11, 0)
