@@ -40,16 +40,21 @@ func TestSBIWrongMode(t *testing.T) {
 		t.Fatalf("ecall failed: %v", err)
 	}
 
-	// Now it should have advanced PC because handleSBI handles it by returning error code
-	if core.pc != 0x1004 {
-		t.Errorf("Expected PC to be 0x1004, got %X", core.pc)
+	// User-mode ECALL is not SBI; it should trap to M-mode by default.
+	if core.pc != 0x0 {
+		t.Errorf("Expected PC to be 0x0 (mtvec), got %X", core.pc)
 	}
 
-	a0 := core.GetRegister(10)
-	errCode := int32(SBI_ERR_NOT_SUPPORTED)
-	expectedA0 := uint32(errCode)
-	if a0 != expectedA0 {
-		t.Errorf("Expected a0 to be %X (SBI_ERR_NOT_SUPPORTED), got %X", expectedA0, a0)
+	if core.mode != ModeMachine {
+		t.Errorf("Expected mode to be Machine after trap, got %d", core.mode)
+	}
+
+	if core.csrs[csrMepc] != 0x1000 {
+		t.Errorf("Expected mepc to be 0x1000, got %X", core.csrs[csrMepc])
+	}
+
+	if core.csrs[csrMcause] != ExceptionEnvironmentCallFromUMode {
+		t.Errorf("Expected mcause to be %d, got %d", ExceptionEnvironmentCallFromUMode, core.csrs[csrMcause])
 	}
 }
 
