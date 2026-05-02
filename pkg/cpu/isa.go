@@ -812,13 +812,17 @@ func mret(core *Core) error {
 
 // sret executes the SRET instruction on the given core.
 func sret(core *Core) error {
-	if core.mode < ModeSupervisor {
+	if core.mode == ModeUser {
 		core.Trap(ExceptionIllegalInstruction, 0)
 		return nil
 	}
 
 	// Restore mode: SPP
 	mstatus := core.csrs[csrMstatus]
+	if core.mode == ModeSupervisor && (mstatus&mstatusTSR) != 0 {
+		core.Trap(ExceptionIllegalInstruction, 0)
+		return nil
+	}
 	if (mstatus & mstatusSPP) != 0 {
 		core.mode = ModeSupervisor
 		slog.Debug(fmt.Sprintf("SRET: Staying in Supervisor mode, pc=%X, sepc=%X", core.pc, core.csrs[csrSepc]))

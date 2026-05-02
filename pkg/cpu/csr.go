@@ -75,6 +75,7 @@ const (
 	mstatusSPP  = 1 << 8
 	mstatusMPP  = 3 << 11
 	mstatusTW   = 1 << 21
+	mstatusTSR  = 1 << 22
 )
 
 // CanAccessCSR checks if the current mode has access to the given CSR address.
@@ -201,6 +202,8 @@ func (c *Core) WriteCSR(address uint32, value uint32) error {
 		c.csrs[csrMip] = value
 	case csrMstatus:
 		c.csrs[csrMstatus] = value
+	case csrSepc:
+		c.csrs[address] = value
 	case csrUie, csrUtvec, csrUscratch, csrUepc, csrUcause, csrUtval, csrUip:
 		// User-mode CSRs - store in csrs array
 		c.csrs[address] = value
