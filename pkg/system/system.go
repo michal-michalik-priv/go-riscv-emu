@@ -25,7 +25,7 @@ type System struct {
 func NewSystem(dummy_tty bool) *System {
 	bus := &devices.Bus{}
 	ramDevice := &devices.RAMDevice{}
-	ramDevice.Initialize(RAMOffset, 0x10000000) // 256 MB RAM
+	ramDevice.Initialize(RAMOffset, 0x8000000) // 128 MB RAM
 	bus.AddDevice(ramDevice)
 
 	if dummy_tty {
